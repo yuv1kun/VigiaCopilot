@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,20 +11,11 @@ import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Save } from 'lucide-react';
 
 const Profile = () => {
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const [apiKey, setApiKey] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-
-  useEffect(() => {
-    if (!user) {
-      navigate('/auth');
-      return;
-    }
-    
-    fetchApiKey();
-  }, [user, navigate]);
 
   const fetchApiKey = async () => {
     if (!user) return;
@@ -75,9 +66,9 @@ const Profile = () => {
     }
   };
 
-  const handleSignOut = async () => {
-    await signOut();
-    navigate('/auth');
+  // Removed signOut function and just navigate directly
+  const handleGoBack = () => {
+    navigate('/');
   };
 
   return (
@@ -128,12 +119,10 @@ const Profile = () => {
         </CardContent>
 
         <CardFooter className="flex justify-between">
-          <Button variant="outline" onClick={() => navigate('/')}>
+          <Button variant="outline" onClick={handleGoBack}>
             Back to Dashboard
           </Button>
-          <Button variant="destructive" onClick={handleSignOut}>
-            Sign Out
-          </Button>
+          {/* Removed signOut button since we don't have that functionality anymore */}
         </CardFooter>
       </Card>
     </div>

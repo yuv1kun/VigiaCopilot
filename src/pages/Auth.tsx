@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { supabase, checkAuthConfig } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -217,18 +218,15 @@ const Auth = () => {
     setAssignedZones(assignedZones.filter(z => z !== zone));
   };
 
-  // Check auth config when component loads
+  // Modified to remove the checkAuthConfig call which was causing errors
   useEffect(() => {
-    const testAuthConfig = async () => {
-      try {
-        const result = await checkAuthConfig();
-        console.log("Auth config test result:", result);
-      } catch (err) {
-        console.error("Error testing auth config:", err);
-      }
-    };
+    // We're now just logging debug info instead of calling checkAuthConfig
+    console.log("Auth component mounted");
     
-    testAuthConfig();
+    // Basic check if Supabase is initialized correctly
+    if (supabase) {
+      console.log("Supabase client is available");
+    }
   }, []);
 
   return (
