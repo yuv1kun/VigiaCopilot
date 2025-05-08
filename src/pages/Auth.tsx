@@ -10,12 +10,16 @@ import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 
 const Auth = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [role, setRole] = useState('operator');
+  const [phone, setPhone] = useState('');
+  const [assignedZones, setAssignedZones] = useState<string[]>([]);
+  const [zoneInput, setZoneInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [signupStep, setSignupStep] = useState(1);
   const navigate = useNavigate();
@@ -41,8 +45,8 @@ const Auth = () => {
             id: authData.user.id,
             name,
             role,
-            contact_info: { email },
-            assigned_zones: [],
+            contact_info: { email, phone },
+            assigned_zones: assignedZones,
             last_login: new Date().toISOString()
           });
 
@@ -94,6 +98,17 @@ const Auth = () => {
 
   const prevStep = () => {
     setSignupStep(1);
+  };
+
+  const addZone = () => {
+    if (zoneInput.trim() && !assignedZones.includes(zoneInput.trim())) {
+      setAssignedZones([...assignedZones, zoneInput.trim()]);
+      setZoneInput('');
+    }
+  };
+
+  const removeZone = (zone: string) => {
+    setAssignedZones(assignedZones.filter(z => z !== zone));
   };
 
   return (
@@ -230,6 +245,57 @@ const Auth = () => {
                         <SelectItem value="admin">Administrator</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-phone">Phone Number</Label>
+                    <Input 
+                      id="signup-phone" 
+                      type="tel" 
+                      placeholder="+1234567890"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Assigned Zones</Label>
+                    <div className="flex gap-2">
+                      <Input 
+                        type="text" 
+                        placeholder="Add zone (e.g., Zone A)"
+                        value={zoneInput}
+                        onChange={(e) => setZoneInput(e.target.value)}
+                      />
+                      <Button 
+                        type="button"
+                        onClick={addZone}
+                        variant="outline"
+                      >
+                        Add
+                      </Button>
+                    </div>
+                    {assignedZones.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {assignedZones.map((zone) => (
+                          <div 
+                            key={zone} 
+                            className="bg-secondary text-secondary-foreground px-3 py-1 rounded-full flex items-center gap-2"
+                          >
+                            <span>{zone}</span>
+                            <Button 
+                              type="button" 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-5 w-5 p-0 rounded-full" 
+                              onClick={() => removeZone(zone)}
+                            >
+                              ×
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </CardContent>
                 
