@@ -9,6 +9,7 @@ import { determineComplianceStatus } from '@/utils/ppeComplianceUtils';
 import { Alert, AlertPriority } from '@/types/equipment';
 import { generateAlert } from '@/utils/monitoringUtils';
 import { useToast } from '@/hooks/use-toast';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const Alerts: React.FC = () => {
   const [isSimulating, setIsSimulating] = useState(true);
