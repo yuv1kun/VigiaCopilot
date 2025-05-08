@@ -2,11 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Bell, ArrowRight, Activity, FileText, Database, VolumeX, Volume2, Key } from 'lucide-react';
+import { Bell, ArrowRight, Activity, FileText, Database, VolumeX, Volume2, Key, User } from 'lucide-react';
 import { SystemStatus } from '@/types/equipment';
 import { speak, stopSpeaking, getVoices } from '@/utils/textToSpeech';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 import { 
   getGeminiApiKey, 
   setGeminiApiKey, 
@@ -151,6 +153,8 @@ const generateAIResponse = (query: string, systemStatus: SystemStatus): string =
 };
 
 const AIAssistant: React.FC = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [inputValue, setInputValue] = useState('');
   const [messages, setMessages] = useState<Message[]>([
     { role: 'system', content: 'Welcome to Vigía AI Assistant. How can I help you today?' },
@@ -168,14 +172,20 @@ const AIAssistant: React.FC = () => {
   const lastResponseRef = useRef<string>('');
   const [showApiKeyDialog, setShowApiKeyDialog] = useState(false);
   const [apiKeyInput, setApiKeyInput] = useState('');
+  const [apiKeyExists, setApiKeyExists] = useState(false);
 
-  // Check if API key is missing on component mount
+  // Check if API key exists on component mount
   useEffect(() => {
-    if (!hasGeminiApiKey()) {
-      // Show API key dialog if no key is found
-      setShowApiKeyDialog(true);
-    }
-  }, []);
+    const checkApiKey = async () => {
+      const hasKey = await hasGeminiApiKey();
+      setApiKeyExists(hasKey);
+      if (!hasKey && user) {
+        setShowApiKeyDialog(true);
+      }
+    };
+    
+    checkApiKey();
+  }, [user]);
 
   // Initialize speech synthesis voices when component mounts
   useEffect(() => {
@@ -233,7 +243,8 @@ const AIAssistant: React.FC = () => {
 
   // Generate AI response using Gemini API
   const getAIResponse = async (query: string): Promise<string> => {
-    if (!hasGeminiApiKey()) {
+    const hasKey = await hasGeminiApiKey();
+    if (!hasKey) {
       setShowApiKeyDialog(true);
       return "Please provide a Gemini API key to enable AI responses.";
     }
@@ -338,15 +349,24 @@ const AIAssistant: React.FC = () => {
     setIsSpeechEnabled(!isSpeechEnabled);
   };
 
-  const saveApiKey = () => {
+  const saveApiKey = async () => {
     if (apiKeyInput.trim()) {
-      setGeminiApiKey(apiKeyInput.trim());
       setShowApiKeyDialog(false);
-      toast.success('Gemini API key saved');
+      const success = await setGeminiApiKey(apiKeyInput.trim());
+      if (success) {
+        toast.success('Gemini API key saved');
+        setApiKeyExists(true);
+      } else {
+        toast.error('Failed to save API key');
+      }
       setApiKeyInput('');
     } else {
       toast.error('Please enter a valid API key');
     }
+  };
+
+  const goToProfile = () => {
+    navigate('/profile');
   };
 
   return (
@@ -361,10 +381,10 @@ const AIAssistant: React.FC = () => {
             <Button 
               variant="ghost" 
               size="icon" 
-              onClick={() => setShowApiKeyDialog(true)} 
-              title="Set Gemini API Key"
+              onClick={goToProfile} 
+              title="Manage profile and API key"
             >
-              <Key className="h-4 w-4" />
+              <User className="h-4 w-4" />
             </Button>
             <Button 
               variant="ghost" 
@@ -445,7 +465,7 @@ const AIAssistant: React.FC = () => {
             <DialogTitle>Gemini API Key Required</DialogTitle>
             <DialogDescription>
               Please enter your Gemini API key to enable AI responses. 
-              Your key will be stored locally in your browser.
+              Your key will be stored securely in your user profile.
             </DialogDescription>
           </DialogHeader>
           
@@ -458,7 +478,7 @@ const AIAssistant: React.FC = () => {
               className="w-full"
             />
             <p className="mt-2 text-xs text-muted-foreground">
-              You can get a Gemini API key from the Google AI Studio website. The key will be stored in your browser's local storage.
+              You can get a Gemini API key from the Google AI Studio website. The key will be stored securely with your user profile.
             </p>
           </div>
           

@@ -3,38 +3,7 @@
  * Utility for making requests to Google's Gemini API
  */
 
-// Store API key locally
-let apiKey: string | null = localStorage.getItem('geminiApiKey');
-
-/**
- * Set the Gemini API key and store it in localStorage
- */
-export const setGeminiApiKey = (key: string): void => {
-  apiKey = key;
-  localStorage.setItem('geminiApiKey', key);
-};
-
-/**
- * Get the currently stored Gemini API key
- */
-export const getGeminiApiKey = (): string | null => {
-  return apiKey;
-};
-
-/**
- * Clear the stored API key
- */
-export const clearGeminiApiKey = (): void => {
-  apiKey = null;
-  localStorage.removeItem('geminiApiKey');
-};
-
-/**
- * Check if the API key is set
- */
-export const hasGeminiApiKey = (): boolean => {
-  return !!apiKey;
-};
+import { supabase } from '@/lib/supabase';
 
 // Define the message role type to match what's used in AIAssistant
 export type MessageRole = 'user' | 'model' | 'system';
@@ -57,12 +26,104 @@ interface GeminiResponse {
 }
 
 /**
+ * Get the Gemini API key for the current user from Supabase
+ */
+export const getGeminiApiKey = async (): Promise<string | null> => {
+  try {
+    const { data: session } = await supabase.auth.getSession();
+    if (!session.session?.user) {
+      console.log('No user logged in');
+      return null;
+    }
+
+    const { data, error } = await supabase
+      .from('api_keys')
+      .select('api_key')
+      .eq('user_id', session.session.user.id)
+      .single();
+
+    if (error || !data) {
+      console.error('Error fetching API key:', error);
+      return null;
+    }
+
+    return data.api_key;
+  } catch (error) {
+    console.error('Error getting API key:', error);
+    return null;
+  }
+};
+
+/**
+ * Set the Gemini API key for the current user
+ */
+export const setGeminiApiKey = async (key: string): Promise<boolean> => {
+  try {
+    const { data: session } = await supabase.auth.getSession();
+    if (!session.session?.user) {
+      console.log('No user logged in');
+      return false;
+    }
+
+    const { error } = await supabase
+      .from('api_keys')
+      .upsert(
+        { 
+          user_id: session.session.user.id, 
+          api_key: key,
+          updated_at: new Date().toISOString()
+        },
+        { onConflict: 'user_id' }
+      );
+
+    if (error) {
+      console.error('Error saving API key:', error);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error setting API key:', error);
+    return false;
+  }
+};
+
+/**
+ * Clear the stored API key (fallback for local storage for backward compatibility)
+ */
+export const clearGeminiApiKey = (): void => {
+  localStorage.removeItem('geminiApiKey');
+};
+
+/**
+ * Check if the current user has an API key stored
+ */
+export const hasGeminiApiKey = async (): Promise<boolean> => {
+  const apiKey = await getGeminiApiKey();
+  
+  // Fallback to localStorage for backward compatibility
+  if (!apiKey) {
+    const localKey = localStorage.getItem('geminiApiKey');
+    return !!localKey;
+  }
+  
+  return !!apiKey;
+};
+
+/**
  * Generate a response using the Gemini API
  */
 export const generateGeminiResponse = async (
   messages: GeminiMessage[],
   systemContext?: string
 ): Promise<string> => {
+  let apiKey = await getGeminiApiKey();
+  
+  // Fallback to localStorage for backward compatibility
+  if (!apiKey) {
+    apiKey = localStorage.getItem('geminiApiKey');
+  }
+  
   if (!apiKey) {
     throw new Error('Gemini API key not set');
   }
