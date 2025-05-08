@@ -1,3 +1,4 @@
+
 /**
  * Utility for text-to-speech functionality using the Web Speech API
  */
@@ -53,6 +54,32 @@ export const getVoices = (): Promise<SpeechSynthesisVoice[]> => {
  * @param text - Text to chunk
  */
 const chunkText = (text: string): string[] => {
+  // First try to split on double newlines (paragraph breaks) for more natural chunks
+  const paragraphs = text.split(/\n\n+/);
+  if (paragraphs.length > 1) {
+    // Further chunk any paragraphs that are too long
+    const chunks: string[] = [];
+    for (const paragraph of paragraphs) {
+      if (paragraph.length > 150) {
+        // For long paragraphs, split by sentence breaks
+        const sentenceChunks = chunkSentences(paragraph);
+        chunks.push(...sentenceChunks);
+      } else if (paragraph.trim()) {
+        // Only add non-empty paragraphs
+        chunks.push(paragraph.trim());
+      }
+    }
+    return chunks;
+  }
+  
+  // If no paragraph breaks or text is very short, use sentence chunking
+  return chunkSentences(text);
+};
+
+/**
+ * Helper function to chunk text by sentences
+ */
+const chunkSentences = (text: string): string[] => {
   // Split text at sentence boundaries for more natural breaks
   const sentenceBreaks = text.match(/[^.!?]+[.!?]+/g) || [];
   
@@ -66,7 +93,7 @@ const chunkText = (text: string): string[] => {
   
   for (const sentence of sentenceBreaks) {
     // If adding this sentence would make the chunk too long, start a new chunk
-    if ((currentChunk + sentence).length > 150 && currentChunk) {
+    if ((currentChunk + sentence).length > 200 && currentChunk) {
       chunks.push(currentChunk.trim());
       currentChunk = sentence;
     } else {
@@ -80,6 +107,24 @@ const chunkText = (text: string): string[] => {
   }
   
   return chunks;
+};
+
+/**
+ * Process and clean text for better speech synthesis
+ */
+const processTextForSpeech = (text: string): string => {
+  // Replace common abbreviations and symbols for better pronunciation
+  return text
+    .replace(/\n/g, ' ')           // Replace newlines with spaces
+    .replace(/\s+/g, ' ')          // Normalize whitespace
+    .replace(/&/g, ' and ')        // Replace & with "and"
+    .replace(/%/g, ' percent ')    // Replace % with "percent"
+    .replace(/°C/g, ' degrees Celsius') // Replace temperature symbol
+    .replace(/BOP/g, 'B O P')      // Speak acronyms letter by letter
+    .replace(/PPE/g, 'P P E')
+    .replace(/H2S/g, 'H 2 S')
+    .replace(/PSI/g, 'P S I')
+    .trim();
 };
 
 /**
@@ -118,8 +163,12 @@ export const speak = async (text: string): Promise<void> => {
     }
   }
 
+  // Process text for better speech synthesis
+  const processedText = processTextForSpeech(text);
+  
   // Split text into chunks for more reliable speech synthesis
-  const textChunks = chunkText(text);
+  const textChunks = chunkText(processedText);
+  console.log(`Speaking text in ${textChunks.length} chunks`);
   
   // Process each chunk sequentially
   for (let i = 0; i < textChunks.length; i++) {
@@ -136,15 +185,16 @@ export const speak = async (text: string): Promise<void> => {
         utterance.voice = selectedVoice;
       }
       
-      // Set voice properties
-      utterance.rate = 1.0; // Normal speed
-      utterance.pitch = 1.0; // Normal pitch
+      // Set voice properties for better clarity
+      utterance.rate = 0.95;  // Slightly slower for better comprehension
+      utterance.pitch = 1.0;  // Normal pitch
       utterance.volume = 1.0; // Full volume
       
       // Add event handlers
       utterance.onend = () => {
         console.log(`Speech chunk ${i + 1}/${textChunks.length} completed`);
-        resolve();
+        // Short delay between chunks for more natural pauses
+        setTimeout(resolve, 300);
       };
       utterance.onerror = (event) => {
         console.error(`Speech error in chunk ${i + 1}:`, event);
@@ -226,7 +276,7 @@ if (isSpeechSynthesisSupported) {
     setInterval(() => {
       if (window.speechSynthesis.speaking) {
         window.speechSynthesis.pause();
-        window.speechSynthesis.resume();
+        setTimeout(() => window.speechSynthesis.resume(), 10);
       }
     }, 5000);
   }

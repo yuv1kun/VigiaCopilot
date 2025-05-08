@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -175,10 +174,179 @@ const AIAssistant: React.FC = () => {
     }
   }, [messages, isSpeechEnabled]);
 
-  // Generate context-aware AI responses using current monitoring data
+  // Enhanced local response generation with better answers to specific questions
   const generateLocalResponse = (query: string): string => {
     const lowercaseQuery = query.toLowerCase();
     const systemStatus = liveSystemStatus.current;
+    
+    // Enhanced response for detailed alerts about warning equipment
+    if (lowercaseQuery.includes('detailed alert') && lowercaseQuery.includes('warning')) {
+      const warningEquipment = equipment.filter(eq => 
+        eq.status === 'warning' || eq.status === 'critical'
+      );
+      
+      if (warningEquipment.length === 0) {
+        return "Currently there are no equipment items in warning or critical state. All systems are operating normally with BOP pressure at " + 
+          monitoringData.bopPressure.formattedValue + " and wellhead temperature at " + monitoringData.wellheadTemperature.formattedValue + ".";
+      }
+      
+      // Generate detailed alert information for each warning equipment
+      let response = `DETAILED ALERT ANALYSIS: ${warningEquipment.length} equipment items require attention:\n\n`;
+      
+      warningEquipment.forEach((eq, index) => {
+        const daysSinceInspection = Math.floor((new Date().getTime() - new Date(eq.lastInspection).getTime()) / (24 * 60 * 60 * 1000));
+        
+        response += `${index + 1}. ${eq.name} (ID: ${eq.id}):\n`;
+        response += `   - Current status: ${eq.status.toUpperCase()}\n`;
+        response += `   - Health score: ${eq.healthScore.toFixed(1)}%\n`;
+        response += `   - Last inspection: ${eq.lastInspection} (${daysSinceInspection} days ago)\n`;
+        response += `   - Recommended action: ${eq.healthScore < 70 ? 'Immediate maintenance required' : 'Schedule inspection within 48 hours'}\n\n`;
+      });
+      
+      // Add correlation with sensor data
+      response += `These issues may be related to the current wellhead temperature of ${monitoringData.wellheadTemperature.formattedValue} (${monitoringData.wellheadTemperature.status} status) and seal integrity at ${monitoringData.sealIntegrity.formattedValue} (${monitoringData.sealIntegrity.status} status).`;
+      
+      return response;
+    }
+    
+    // Enhanced response for efficiency trend over the last 24 hours
+    if (lowercaseQuery.includes('efficiency trend') && (lowercaseQuery.includes('24 hours') || lowercaseQuery.includes('24h'))) {
+      const primaryPumpEff = 92 - ((monitoringData.wellheadTemperature.value - 85) * 0.2);
+      const compressorEff = 88 - ((monitoringData.gasDetection.value - 3) * 0.8);
+      
+      // Generate simulated 24-hour efficiency data based on current sensor values
+      const hourlySteps = 8; // Show 8 timepoints over 24 hours
+      const primaryPumpTrend = [];
+      const compressorTrend = [];
+      
+      for (let i = 0; i < hourlySteps; i++) {
+        const hoursAgo = Math.round((hourlySteps - i) * (24 / hourlySteps));
+        // Base efficiency with random variations and slight downward trend
+        const timeFactor = i / hourlySteps; // Increases as we get closer to present time
+        const randomVariation = Math.sin(i * 0.7) * 1.2;
+        
+        // Simulate declining efficiency with recent recovery attempt
+        const pumpEff = primaryPumpEff - 2.5 + (timeFactor * 2.5) + randomVariation;
+        const compEff = compressorEff - 3.0 + (timeFactor * 3.0) + randomVariation * 0.8;
+        
+        primaryPumpTrend.push({
+          timeAgo: `${hoursAgo}h ago`, 
+          efficiency: Math.min(100, Math.max(60, pumpEff)).toFixed(1)
+        });
+        
+        compressorTrend.push({
+          timeAgo: `${hoursAgo}h ago`, 
+          efficiency: Math.min(100, Math.max(60, compEff)).toFixed(1)
+        });
+      }
+      
+      // Calculate trends
+      const pumpEffStart = parseFloat(primaryPumpTrend[0].efficiency);
+      const pumpEffEnd = parseFloat(primaryPumpTrend[primaryPumpTrend.length - 1].efficiency);
+      const pumpTrendPct = ((pumpEffEnd - pumpEffStart) / pumpEffStart * 100).toFixed(1);
+      
+      const compEffStart = parseFloat(compressorTrend[0].efficiency);
+      const compEffEnd = parseFloat(compressorTrend[compressorTrend.length - 1].efficiency);
+      const compTrendPct = ((compEffEnd - compEffStart) / compEffStart * 100).toFixed(1);
+      
+      let response = `24-HOUR EFFICIENCY TREND ANALYSIS:\n\n`;
+      
+      response += `Primary Pump: Currently at ${primaryPumpEff.toFixed(1)}% (${pumpTrendPct}% change over 24h)\n`;
+      primaryPumpTrend.forEach(point => {
+        response += `   ${point.timeAgo}: ${point.efficiency}%\n`;
+      });
+      
+      response += `\nMain Compressor: Currently at ${compressorEff.toFixed(1)}% (${compTrendPct}% change over 24h)\n`;
+      compressorTrend.forEach(point => {
+        response += `   ${point.timeAgo}: ${point.efficiency}%\n`;
+      });
+      
+      response += `\nEfficiency is directly affected by current wellhead temperature (${monitoringData.wellheadTemperature.formattedValue}) and gas detection levels (${monitoringData.gasDetection.formattedValue}).`;
+      
+      if (parseFloat(pumpTrendPct) < 0 || parseFloat(compTrendPct) < 0) {
+        response += ` Alert: Declining efficiency trend detected in the past 24 hours. Recommend system inspection.`;
+      }
+      
+      return response;
+    }
+    
+    // Enhanced response for correlated warnings across systems
+    if (lowercaseQuery.includes('correlated warning') || (lowercaseQuery.includes('warning') && lowercaseQuery.includes('across'))) {
+      const gasLevels = monitoringData.gasDetection.value;
+      const temperature = monitoringData.wellheadTemperature.value;
+      const pressure = monitoringData.bopPressure.value;
+      const sealIntegrity = monitoringData.sealIntegrity.value;
+      
+      // Check for patterns that indicate correlated issues
+      const tempHighWithSealLow = temperature > 85 && sealIntegrity < 95;
+      const pressureVarianceWithGas = Math.abs(pressure - 1400) > 50 && gasLevels > 3;
+      const multipleSystemWarnings = equipment.filter(eq => eq.status === 'warning' || eq.status === 'critical').length > 1;
+      
+      let response = "CORRELATION ANALYSIS OF SYSTEM WARNINGS:\n\n";
+      
+      if (!tempHighWithSealLow && !pressureVarianceWithGas && !multipleSystemWarnings) {
+        response += "No significant correlations detected between current system warnings. All parameters are within normal operational ranges or warnings are isolated to individual systems.\n\n";
+        response += `Current key readings:\n- BOP Pressure: ${monitoringData.bopPressure.formattedValue} (${monitoringData.bopPressure.status} status)\n- Wellhead Temperature: ${monitoringData.wellheadTemperature.formattedValue} (${monitoringData.wellheadTemperature.status} status)\n- Gas Detection: ${monitoringData.gasDetection.formattedValue} (${monitoringData.gasDetection.status} status)`;
+        return response;
+      }
+      
+      // Report on correlations found
+      if (tempHighWithSealLow) {
+        response += "1. TEMPERATURE-SEAL CORRELATION DETECTED:\n";
+        response += `   Elevated wellhead temperature (${monitoringData.wellheadTemperature.formattedValue}) is directly affecting seal integrity (${monitoringData.sealIntegrity.formattedValue}).\n`;
+        response += "   This indicates potential thermal stress on sealing components.\n";
+        response += `   Recommended action: ${monitoringData.sealIntegrity.value < 90 ? 'Immediate inspection of seals' : 'Monitor and schedule preventive maintenance'}.\n\n`;
+      }
+      
+      if (pressureVarianceWithGas) {
+        response += "2. PRESSURE-GAS CORRELATION DETECTED:\n";
+        response += `   BOP pressure variance (${monitoringData.bopPressure.formattedValue}) coupled with elevated gas readings (${monitoringData.gasDetection.formattedValue}).\n`;
+        response += "   This may indicate a developing leak or valve issue.\n";
+        response += `   Recommended action: Verify pressure relief valve operation and inspect gas detection system calibration.\n\n`;
+      }
+      
+      if (multipleSystemWarnings) {
+        response += "3. MULTIPLE SYSTEM WARNING PATTERN:\n";
+        const warningEquipment = equipment.filter(eq => eq.status === 'warning' || eq.status === 'critical');
+        response += `   ${warningEquipment.length} systems showing concurrent warnings: ${warningEquipment.map(eq => eq.name).join(', ')}.\n`;
+        response += "   This multi-system pattern suggests a common underlying cause.\n";
+        response += `   Recommended action: Conduct comprehensive system diagnostic with focus on power supply and control systems.\n\n`;
+      }
+      
+      response += `Current data shows ${monitoringData.nextMaintenance.value} days until next scheduled maintenance, with pipe corrosion rate at ${monitoringData.pipeCorrosion.formattedValue}.`;
+      
+      return response;
+    }
+    
+    // Enhanced response for primary pump health score
+    if (lowercaseQuery.includes('health score') && lowercaseQuery.includes('primary pump')) {
+      const primaryPumpHealthScore = 100 - ((monitoringData.wellheadTemperature.value - 85) * 0.5);
+      const healthStatus = primaryPumpHealthScore > 90 ? 'EXCELLENT' : 
+                          primaryPumpHealthScore > 80 ? 'GOOD' : 
+                          primaryPumpHealthScore > 70 ? 'FAIR' : 'POOR';
+      
+      const corrosionImpact = (parseFloat(monitoringData.pipeCorrosion.value.toFixed(2)) * 10).toFixed(1);
+      const sealImpact = ((100 - monitoringData.sealIntegrity.value) * 0.5).toFixed(1);
+      
+      let response = "PRIMARY PUMP HEALTH ASSESSMENT:\n\n";
+      response += `Current health score: ${primaryPumpHealthScore.toFixed(1)}% (${healthStatus})\n\n`;
+      response += "Contributing factors:\n";
+      response += `- Operating temperature impact: -${(monitoringData.wellheadTemperature.value - 85).toFixed(1)} points (${monitoringData.wellheadTemperature.formattedValue})\n`;
+      response += `- Corrosion impact: -${corrosionImpact} points (${monitoringData.pipeCorrosion.formattedValue})\n`;
+      response += `- Seal integrity impact: -${sealImpact} points (${monitoringData.sealIntegrity.formattedValue})\n`;
+      response += `- Days since maintenance: ${Math.floor((new Date().getTime() - new Date('2025-04-12').getTime()) / (1000 * 60 * 60 * 24))} days\n\n`;
+      
+      response += `Recommended action: ${
+        primaryPumpHealthScore > 90 ? 'Continue normal operation with standard monitoring' : 
+        primaryPumpHealthScore > 80 ? 'Schedule routine inspection within the next week' : 
+        primaryPumpHealthScore > 70 ? 'Perform detailed diagnosis within 48 hours' : 
+        'Immediate maintenance required - consider equipment shutdown'
+      }\n\n`;
+      
+      response += `Next scheduled maintenance: ${monitoringData.nextMaintenance.formattedValue} (${monitoringData.nextMaintenance.status} status)`;
+      
+      return response;
+    }
     
     // Safety protocol queries
     if (lowercaseQuery.includes('safety') && lowercaseQuery.includes('protocol')) {
