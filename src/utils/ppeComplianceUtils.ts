@@ -34,6 +34,15 @@ const PPE_PARAMETERS = {
 // Types of PPE for type safety
 type PPEType = keyof typeof PPE_PARAMETERS;
 
+// Direction type for trend
+export type TrendDirection = 'up' | 'down' | 'flat';
+
+// Trend type interface
+export interface Trend {
+  value: number;
+  direction: TrendDirection;
+}
+
 // Time-based factors affecting compliance
 const getTimeBasedFactors = (): { shiftChange: boolean; peakHours: boolean } => {
   const now = new Date();
@@ -94,12 +103,12 @@ export const determineComplianceStatus = (value: number): 'critical' | 'warning'
 };
 
 // Calculate compliance trend
-export const calculateComplianceTrend = (current: number, previous: number) => {
-  if (!previous) return { value: 0, direction: 'flat' as const };
+export const calculateComplianceTrend = (current: number, previous: number): Trend => {
+  if (!previous) return { value: 0, direction: 'flat' };
   const difference = current - previous;
   const percentChange = difference;
   
-  let direction: 'up' | 'down' | 'flat';
+  let direction: TrendDirection;
   if (Math.abs(percentChange) < 0.5) {
     direction = 'flat';
   } else {
@@ -107,7 +116,7 @@ export const calculateComplianceTrend = (current: number, previous: number) => {
   }
   
   return {
-    value: Math.abs(percentChange).toFixed(1),
+    value: Math.abs(percentChange),
     direction
   };
 };

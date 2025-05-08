@@ -1,12 +1,19 @@
 
 import { useState, useEffect } from 'react';
-import { simulatePPECompliance, determineComplianceStatus, calculateComplianceTrend } from '@/utils/ppeComplianceUtils';
+import { simulatePPECompliance, determineComplianceStatus, calculateComplianceTrend, Trend } from '@/utils/ppeComplianceUtils';
 
 interface PPEComplianceData {
   hardHat: number;
   safetyGlasses: number;
   safetyVests: number;
   protectiveGloves: number;
+}
+
+interface ComplianceTrends {
+  hardHat: Trend;
+  safetyGlasses: Trend;
+  safetyVests: Trend;
+  protectiveGloves: Trend;
 }
 
 export const usePPECompliance = (isActive: boolean, updateInterval: number = 2000) => {
@@ -34,11 +41,11 @@ export const usePPECompliance = (isActive: boolean, updateInterval: number = 200
   });
 
   // Trends for each PPE item
-  const [complianceTrends, setComplianceTrends] = useState({
-    hardHat: { value: 0, direction: 'flat' as const },
-    safetyGlasses: { value: 0, direction: 'flat' as const },
-    safetyVests: { value: 0, direction: 'flat' as const },
-    protectiveGloves: { value: 0, direction: 'flat' as const }
+  const [complianceTrends, setComplianceTrends] = useState<ComplianceTrends>({
+    hardHat: { value: 0, direction: 'flat' },
+    safetyGlasses: { value: 0, direction: 'flat' },
+    safetyVests: { value: 0, direction: 'flat' },
+    protectiveGloves: { value: 0, direction: 'flat' }
   });
 
   useEffect(() => {
@@ -65,7 +72,7 @@ export const usePPECompliance = (isActive: boolean, updateInterval: number = 200
         };
         
         // Calculate trends
-        const trends = {
+        const trends: ComplianceTrends = {
           hardHat: calculateComplianceTrend(newData.hardHat, prevValues.hardHat),
           safetyGlasses: calculateComplianceTrend(newData.safetyGlasses, prevValues.safetyGlasses),
           safetyVests: calculateComplianceTrend(newData.safetyVests, prevValues.safetyVests),
@@ -89,7 +96,7 @@ export const usePPECompliance = (isActive: boolean, updateInterval: number = 200
       clearInterval(dataInterval);
       clearInterval(trendInterval);
     };
-  }, [isActive, updateInterval, ppeComplianceData]);
+  }, [isActive, updateInterval, prevValues]);
 
   return {
     ppeComplianceData,
