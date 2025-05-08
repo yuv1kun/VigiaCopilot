@@ -1,10 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Bell, ArrowRight, Activity, FileText, Database } from 'lucide-react';
+import { Bell, ArrowRight, Activity, FileText, Database, VolumeX, Volume2 } from 'lucide-react';
 import { SystemStatus } from '@/types/equipment';
+import { speak, stopSpeaking } from '@/utils/textToSpeech';
 
 // Simulated system status for the AI assistant
 const simulatedSystemStatus: SystemStatus = {
@@ -147,6 +147,7 @@ const AIAssistant: React.FC = () => {
     'Show historical analysis for the primary pump',
     'What are the current safety protocols?'
   ]);
+  const [isSpeechEnabled, setIsSpeechEnabled] = useState(false);
 
   // Update system status periodically to simulate real-time changes
   useEffect(() => {
@@ -167,6 +168,24 @@ const AIAssistant: React.FC = () => {
     }, 5000);
     
     return () => clearInterval(interval);
+  }, []);
+
+  // Initialize speech synthesis voices when component mounts
+  useEffect(() => {
+    // Chrome needs a trigger to load voices
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.onvoiceschanged = () => {
+        // This event fires when voices are available
+        // No action needed here, just ensuring voices are loaded
+      };
+      // Try to load voices immediately
+      window.speechSynthesis.getVoices();
+    }
+    
+    // Clean up speech when component unmounts
+    return () => {
+      stopSpeaking();
+    };
   }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -194,6 +213,11 @@ const AIAssistant: React.FC = () => {
       ]);
       setIsTyping(false);
       
+      // Speak the response if speech is enabled
+      if (isSpeechEnabled) {
+        speak(aiResponse);
+      }
+      
       // Update suggested queries based on the conversation
       if (inputValue.toLowerCase().includes('maintenance')) {
         setSuggestedQueries([
@@ -217,6 +241,13 @@ const AIAssistant: React.FC = () => {
     setInputValue(query);
   };
 
+  const toggleSpeech = () => {
+    if (isSpeechEnabled) {
+      stopSpeaking();
+    }
+    setIsSpeechEnabled(!isSpeechEnabled);
+  };
+
   return (
     <Card className="bg-vigia-card border-border h-full flex flex-col">
       <div className="p-3 border-b border-border flex items-center justify-between">
@@ -224,9 +255,19 @@ const AIAssistant: React.FC = () => {
           <div className="h-2 w-2 rounded-full bg-vigia-teal animate-pulse"></div>
           <h2 className="font-medium">Vigía AI Assistant</h2>
         </div>
-        <Button variant="ghost" size="icon">
-          <Bell className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={toggleSpeech} 
+            title={isSpeechEnabled ? "Disable voice responses" : "Enable voice responses"}
+          >
+            {isSpeechEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+          </Button>
+          <Button variant="ghost" size="icon">
+            <Bell className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
       
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
