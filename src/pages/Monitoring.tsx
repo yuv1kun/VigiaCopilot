@@ -8,17 +8,17 @@ const Monitoring: React.FC = () => {
   return (
     <div className="min-h-screen flex flex-col bg-vigia-bg text-foreground">
       <Header />
-      <main className="flex-1">
-        <div className="container mx-auto py-6 px-4">
-          <h1 className="text-2xl font-bold mb-6">Monitoring Dashboard</h1>
+      <main className="flex-1 overflow-y-auto">
+        <div className="container mx-auto py-8 px-4 max-w-7xl">
+          <h1 className="text-2xl font-bold mb-8">Monitoring Dashboard</h1>
           
-          <div className="space-y-8">
+          <div className="space-y-10">
             <RealTimeEquipment />
             <MonitoringPanel />
           </div>
         </div>
       </main>
-      <footer className="py-4 px-6 border-t border-border">
+      <footer className="py-4 px-6 border-t border-border mt-8">
         <div className="container mx-auto text-center text-sm text-muted-foreground">
           <p>Vigía Safety Copilot v1.0.0 | Offshore Oil Rig Monitoring System</p>
         </div>

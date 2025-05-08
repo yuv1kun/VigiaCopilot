@@ -233,25 +233,32 @@ const EquipmentCard: React.FC<{ equipment: EquipmentData }> = ({ equipment }) =>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
+          {/* Metrics Grid - Fixed overlapping content */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Pressure:</span>
-                <span className={getParameterStatus('pressure', equipment.pressure)}>{equipment.pressure} PSI</span>
+                <span className={getParameterStatus('pressure', equipment.pressure)}>
+                  {equipment.pressure.toFixed(0)} PSI
+                </span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Temperature:</span>
-                <span className={getParameterStatus('temperature', equipment.temperature)}>{equipment.temperature}°C</span>
+                <span className={getParameterStatus('temperature', equipment.temperature)}>
+                  {equipment.temperature.toFixed(1)}°C
+                </span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Vibration:</span>
-                <span className={getParameterStatus('vibration', equipment.vibration)}>{equipment.vibration} mm/s</span>
+                <span className={getParameterStatus('vibration', equipment.vibration)}>
+                  {equipment.vibration.toFixed(2)} mm/s
+                </span>
               </div>
             </div>
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">RPM:</span>
-                <span>{equipment.rpm}</span>
+                <span>{equipment.rpm.toFixed(0)}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Run Hours:</span>
@@ -260,7 +267,7 @@ const EquipmentCard: React.FC<{ equipment: EquipmentData }> = ({ equipment }) =>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Efficiency:</span>
                 <span className={equipment.efficiency < 85 ? 'text-vigia-warning' : 'text-vigia-success'}>
-                  {equipment.efficiency}%
+                  {equipment.efficiency.toFixed(1)}%
                 </span>
               </div>
             </div>
@@ -269,7 +276,7 @@ const EquipmentCard: React.FC<{ equipment: EquipmentData }> = ({ equipment }) =>
           <div className="pt-2">
             <div className="text-sm font-medium pb-1 flex justify-between">
               <span>Efficiency</span>
-              <span>{equipment.efficiency}%</span>
+              <span>{equipment.efficiency.toFixed(1)}%</span>
             </div>
             <Progress 
               value={equipment.efficiency} 
