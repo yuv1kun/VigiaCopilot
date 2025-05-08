@@ -2,33 +2,73 @@
 import React from 'react';
 import { Bell, Eye, Gauge, Shield, Wrench } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Link, useLocation } from 'react-router-dom';
 
 const Header: React.FC = () => {
+  const location = useLocation();
+  
+  // Helper function to determine if a link is active
+  const isActive = (path: string) => {
+    return location.pathname === path;
+  };
+
   return (
     <header className="bg-vigia-card border-b border-border py-3 px-4">
       <div className="container mx-auto">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            <Shield className="h-6 w-6 text-vigia-teal" />
-            <h1 className="text-xl font-bold">Vigía <span className="text-vigia-teal">Safety Copilot</span></h1>
+            <Link to="/">
+              <div className="flex items-center space-x-2">
+                <Shield className="h-6 w-6 text-vigia-teal" />
+                <h1 className="text-xl font-bold">Vigía <span className="text-vigia-teal">Safety Copilot</span></h1>
+              </div>
+            </Link>
           </div>
           
           <nav className="hidden md:flex items-center space-x-1">
-            <Button variant="ghost" className="flex items-center space-x-1" size="sm">
-              <Gauge className="h-4 w-4" />
-              <span>Dashboard</span>
+            <Button 
+              variant={isActive('/') ? "default" : "ghost"} 
+              className="flex items-center space-x-1" 
+              size="sm"
+              asChild
+            >
+              <Link to="/">
+                <Gauge className="h-4 w-4" />
+                <span>Dashboard</span>
+              </Link>
             </Button>
-            <Button variant="ghost" className="flex items-center space-x-1" size="sm">
-              <Eye className="h-4 w-4" />
-              <span>Monitoring</span>
+            <Button 
+              variant={isActive('/monitoring') ? "default" : "ghost"} 
+              className="flex items-center space-x-1" 
+              size="sm"
+              asChild
+            >
+              <Link to="/monitoring">
+                <Eye className="h-4 w-4" />
+                <span>Monitoring</span>
+              </Link>
             </Button>
-            <Button variant="ghost" className="flex items-center space-x-1" size="sm">
-              <Wrench className="h-4 w-4" />
-              <span>Maintenance</span>
+            <Button 
+              variant={isActive('/maintenance') ? "default" : "ghost"} 
+              className="flex items-center space-x-1" 
+              size="sm"
+              asChild
+            >
+              <Link to="/maintenance">
+                <Wrench className="h-4 w-4" />
+                <span>Maintenance</span>
+              </Link>
             </Button>
-            <Button variant="ghost" className="flex items-center space-x-1" size="sm">
-              <Bell className="h-4 w-4" />
-              <span>Alerts</span>
+            <Button 
+              variant={isActive('/alerts') ? "default" : "ghost"} 
+              className="flex items-center space-x-1" 
+              size="sm"
+              asChild
+            >
+              <Link to="/alerts">
+                <Bell className="h-4 w-4" />
+                <span>Alerts</span>
+              </Link>
             </Button>
           </nav>
           
