@@ -1,7 +1,7 @@
 
 import React from 'react';
 import StatusCard from './StatusCard';
-import { Gauge, Thermometer, Triangle, Eye, Bell, HardDrive, Info, Shield } from 'lucide-react';
+import { Gauge, Thermometer, Triangle, Eye, Bell, HardDrive, Info, Shield, Wrench } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 
 const MonitoringPanel: React.FC = () => {
