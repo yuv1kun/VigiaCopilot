@@ -22,17 +22,36 @@ const Auth = () => {
   const [zoneInput, setZoneInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [signupStep, setSignupStep] = useState(1);
+  const [validationError, setValidationError] = useState<string | null>(null);
   const navigate = useNavigate();
+
+  // Email validation function
+  const validateEmail = (email: string) => {
+    // Basic email validation pattern
+    const emailPattern = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
+    return emailPattern.test(email);
+  };
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
+    setValidationError(null);
     setLoading(true);
+
+    // Validate email format first
+    if (!validateEmail(email)) {
+      setValidationError('Please enter a valid email address');
+      setLoading(false);
+      return;
+    }
 
     try {
       // First create the authentication account
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          emailRedirectTo: window.location.origin
+        }
       });
 
       if (authError) throw authError;
@@ -55,7 +74,13 @@ const Auth = () => {
         toast.success('Account created! Check your email for the confirmation link.');
       }
     } catch (error: any) {
-      toast.error(error.message || 'An error occurred during sign up');
+      console.error('Sign up error:', error); 
+      // Handle specific Supabase auth errors
+      if (error.message.includes('email')) {
+        setValidationError(error.message);
+      } else {
+        toast.error(error.message || 'An error occurred during sign up');
+      }
     } finally {
       setLoading(false);
     }
@@ -63,7 +88,15 @@ const Auth = () => {
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
+    setValidationError(null);
     setLoading(true);
+
+    // Validate email format first
+    if (!validateEmail(email)) {
+      setValidationError('Please enter a valid email address');
+      setLoading(false);
+      return;
+    }
 
     try {
       const { error } = await supabase.auth.signInWithPassword({
@@ -85,7 +118,13 @@ const Auth = () => {
       toast.success('Signed in successfully');
       navigate('/');
     } catch (error: any) {
-      toast.error(error.message || 'Error signing in');
+      console.error('Sign in error:', error);
+      // Handle specific Supabase auth errors
+      if (error.message.includes('email')) {
+        setValidationError(error.message);
+      } else {
+        toast.error(error.message || 'Error signing in');
+      }
     } finally {
       setLoading(false);
     }
@@ -93,11 +132,26 @@ const Auth = () => {
 
   const nextStep = (e: React.FormEvent) => {
     e.preventDefault();
+    setValidationError(null);
+
+    // Validate email format
+    if (!validateEmail(email)) {
+      setValidationError('Please enter a valid email address');
+      return;
+    }
+
+    // Password validation
+    if (password.length < 6) {
+      setValidationError('Password must be at least 6 characters');
+      return;
+    }
+
     setSignupStep(2);
   };
 
   const prevStep = () => {
     setSignupStep(1);
+    setValidationError(null);
   };
 
   const addZone = () => {
@@ -130,14 +184,22 @@ const Auth = () => {
           <TabsContent value="signin">
             <form onSubmit={handleSignIn}>
               <CardContent className="space-y-4 pt-4">
+                {validationError && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{validationError}</AlertDescription>
+                  </Alert>
+                )}
                 <div className="space-y-2">
                   <Label htmlFor="signin-email">Email</Label>
                   <Input 
                     id="signin-email" 
                     type="email" 
-                    placeholder="your@email.com"
+                    placeholder="your.name@example.com"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      setValidationError(null);
+                    }}
                     required
                   />
                 </div>
@@ -170,16 +232,27 @@ const Auth = () => {
             {signupStep === 1 ? (
               <form onSubmit={nextStep}>
                 <CardContent className="space-y-4 pt-4">
+                  {validationError && (
+                    <Alert variant="destructive">
+                      <AlertDescription>{validationError}</AlertDescription>
+                    </Alert>
+                  )}
                   <div className="space-y-2">
                     <Label htmlFor="signup-email">Email</Label>
                     <Input 
                       id="signup-email" 
                       type="email" 
-                      placeholder="your@email.com"
+                      placeholder="your.name@example.com"
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      onChange={(e) => {
+                        setEmail(e.target.value);
+                        setValidationError(null);
+                      }}
                       required
                     />
+                    <p className="text-xs text-muted-foreground">
+                      Use a valid email format, e.g., name@example.com
+                    </p>
                   </div>
                   
                   <div className="space-y-2">
@@ -188,7 +261,10 @@ const Auth = () => {
                       id="signup-password" 
                       type="password"
                       value={password}
-                      onChange={(e) => setPassword(e.target.value)}
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        setValidationError(null);
+                      }}
                       required
                     />
                     <p className="text-xs text-muted-foreground">
@@ -209,6 +285,11 @@ const Auth = () => {
             ) : (
               <form onSubmit={handleSignUp}>
                 <CardContent className="space-y-4 pt-4">
+                  {validationError && (
+                    <Alert variant="destructive">
+                      <AlertDescription>{validationError}</AlertDescription>
+                    </Alert>
+                  )}
                   <Alert>
                     <AlertDescription>
                       Complete your profile information
