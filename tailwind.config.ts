@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -61,6 +62,17 @@ export default {
 					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
+				},
+				// Custom colors for Vigía
+				vigia: {
+					bg: '#121212',
+					card: '#1e1e2e',
+					teal: '#00A3A3',
+					blue: '#0A84FF',
+					warning: '#FFA500',
+					danger: '#FF3B30',
+					success: '#34C759',
+					muted: '#6e6e6e'
 				}
 			},
 			borderRadius: {
@@ -84,11 +96,38 @@ export default {
 					to: {
 						height: '0'
 					}
+				},
+				pulse: {
+					'0%, 100%': {
+						opacity: '1'
+					},
+					'50%': {
+						opacity: '0.5'
+					}
+				},
+				blink: {
+					'0%, 100%': {
+						opacity: '1'
+					},
+					'50%': {
+						opacity: '0.2'
+					}
+				},
+				fadeIn: {
+					'0%': {
+						opacity: '0'
+					},
+					'100%': {
+						opacity: '1'
+					}
 				}
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
-				'accordion-up': 'accordion-up 0.2s ease-out'
+				'accordion-up': 'accordion-up 0.2s ease-out',
+				'pulse-slow': 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+				'alert-blink': 'blink 1s ease-in-out infinite',
+				'fade-in': 'fadeIn 0.5s ease-out'
 			}
 		}
 	},
