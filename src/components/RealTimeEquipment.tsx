@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -417,23 +418,23 @@ const EquipmentCard: React.FC<{ equipment: EquipmentData }> = ({ equipment }) =>
             </ChartContainer>
           </div>
           
-          {/* Component health section */}
+          {/* Component health section - modified to fix overflow issues */}
           <div className="pt-1 border-t border-border mt-2">
             <h4 className="text-sm font-medium mb-2">Component Health</h4>
             <div className="space-y-2">
               {equipment.components?.map((component, idx) => (
-                <div key={idx} className="flex items-center text-xs justify-between">
-                  <div className="flex items-center gap-1">
-                    <div className={`h-2 w-2 rounded-full ${
+                <div key={idx} className="flex items-center text-xs justify-between gap-2">
+                  <div className="flex items-center gap-1 min-w-0 flex-shrink">
+                    <div className={`h-2 w-2 shrink-0 rounded-full ${
                       component.status === 'normal' ? 'bg-vigia-success' :
                       component.status === 'warning' ? 'bg-vigia-warning' :
                       component.status === 'critical' ? 'bg-vigia-error' :
                       'bg-vigia-blue'
                     }`}></div>
-                    <span>{component.name}</span>
+                    <span className="truncate">{component.name}</span>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <div className="w-16 h-1.5 bg-muted/30 rounded-full overflow-hidden">
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <div className="w-16 h-1.5 bg-muted/30 rounded-full overflow-hidden flex-shrink-0">
                       <div 
                         className={`h-full rounded-full ${
                           component.healthScore > 85 ? 'bg-vigia-success' :
@@ -444,7 +445,7 @@ const EquipmentCard: React.FC<{ equipment: EquipmentData }> = ({ equipment }) =>
                         style={{ width: `${component.healthScore}%` }}
                       />
                     </div>
-                    <span className="text-muted-foreground min-w-[30px] text-right">{component.healthScore}%</span>
+                    <span className="text-muted-foreground whitespace-nowrap">{component.healthScore}%</span>
                   </div>
                 </div>
               ))}
@@ -631,3 +632,4 @@ const RealTimeEquipment: React.FC = () => {
 };
 
 export default RealTimeEquipment;
+
