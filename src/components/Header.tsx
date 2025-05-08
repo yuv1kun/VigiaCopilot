@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
-import { Bell, Eye, Gauge, Shield, Wrench } from 'lucide-react';
+import { Bell, Eye, Gauge, Wrench } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link, useLocation } from 'react-router-dom';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -259,7 +260,11 @@ const Header: React.FC = () => {
           <div className="flex items-center space-x-2">
             <Link to="/">
               <div className="flex items-center space-x-2">
-                <Shield className="h-6 w-6 text-vigia-teal" />
+                <img 
+                  src="https://cdn-icons-png.flaticon.com/512/17558/17558770.png" 
+                  alt="Vigía Logo" 
+                  className="h-6 w-6" 
+                />
                 <h1 className="text-xl font-bold">Vigía <span className="text-vigia-teal">Safety Copilot</span></h1>
               </div>
             </Link>
