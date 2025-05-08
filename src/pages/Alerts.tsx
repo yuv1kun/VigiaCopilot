@@ -1,11 +1,223 @@
-
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Header from '@/components/Header';
 import { Card } from '@/components/ui/card';
-import { AlertTriangle, Bell, Clock, CheckCircle, X, Info, AlertCircle } from 'lucide-react';
+import { AlertTriangle, Bell, Clock, CheckCircle, X, Info, AlertCircle, BellDot } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { usePPECompliance } from '@/hooks/usePPECompliance';
+import { useRealTimeMonitoring } from '@/hooks/useRealTimeMonitoring';
+import { determineComplianceStatus } from '@/utils/ppeComplianceUtils';
+import { Alert, AlertPriority } from '@/types/equipment';
+import { generateAlert } from '@/utils/monitoringUtils';
 
 const Alerts: React.FC = () => {
+  const [isSimulating, setIsSimulating] = useState(true);
+  
+  // Get real-time monitoring data
+  const monitoring = useRealTimeMonitoring(1000);
+  
+  // Get PPE compliance data
+  const { ppeComplianceData, complianceStatus } = usePPECompliance(isSimulating);
+  
+  // State to store generated alerts
+  const [activeAlerts, setActiveAlerts] = useState<Alert[]>([]);
+  const [resolvedAlerts, setResolvedAlerts] = useState<Alert[]>([]);
+
+  // Generate alerts based on monitoring data
+  useEffect(() => {
+    if (!isSimulating) return;
+
+    // Helper function to create an alert
+    const createAlert = (
+      parameter: string,
+      value: number,
+      threshold: number,
+      message: string,
+      priority: AlertPriority
+    ): Alert => {
+      return {
+        id: `alert-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        equipmentId: parameter,
+        timestamp: new Date(),
+        message,
+        parameter,
+        value,
+        threshold,
+        priority,
+        isAcknowledged: false
+      };
+    };
+
+    // Check for alerts from real-time monitoring
+    const checkRealTimeAlerts = () => {
+      const newAlerts: Alert[] = [];
+      
+      // Check BOP pressure
+      if (monitoring.bopPressure.status === 'warning' || monitoring.bopPressure.status === 'alert') {
+        const { message, priority } = generateAlert('bopPressure', monitoring.bopPressure.value, 1700);
+        newAlerts.push(createAlert('bopPressure', monitoring.bopPressure.value, 1700, message, priority));
+      }
+      
+      // Check wellhead temperature
+      if (monitoring.wellheadTemperature.status === 'warning' || monitoring.wellheadTemperature.status === 'alert') {
+        const { message, priority } = generateAlert('wellheadTemperature', monitoring.wellheadTemperature.value, 95);
+        newAlerts.push(createAlert('wellheadTemperature', monitoring.wellheadTemperature.value, 95, message, priority));
+      }
+      
+      // Check gas detection
+      if (monitoring.gasDetection.status === 'warning' || monitoring.gasDetection.status === 'alert') {
+        const { message, priority } = generateAlert('gasDetection', monitoring.gasDetection.value, 5.0);
+        newAlerts.push(createAlert('gasDetection', monitoring.gasDetection.value, 5.0, message, priority));
+      }
+      
+      // Check seal integrity
+      if (monitoring.sealIntegrity.status === 'warning' || monitoring.sealIntegrity.status === 'alert') {
+        const { message, priority } = generateAlert('sealIntegrity', monitoring.sealIntegrity.value, 85);
+        newAlerts.push(createAlert('sealIntegrity', monitoring.sealIntegrity.value, 85, message, priority));
+      }
+      
+      // Check pipe corrosion
+      if (monitoring.pipeCorrosion.status === 'warning' || monitoring.pipeCorrosion.status === 'alert') {
+        const { message, priority } = generateAlert('pipeCorrosion', monitoring.pipeCorrosion.value, 0.3);
+        newAlerts.push(createAlert('pipeCorrosion', monitoring.pipeCorrosion.value, 0.3, message, priority));
+      }
+      
+      // Check next maintenance
+      if (monitoring.nextMaintenance.status === 'warning' || monitoring.nextMaintenance.status === 'alert') {
+        const { message, priority } = generateAlert('nextMaintenance', monitoring.nextMaintenance.value, 3);
+        newAlerts.push(createAlert('nextMaintenance', monitoring.nextMaintenance.value, 3, message, priority));
+      }
+      
+      // Check PPE compliance
+      const ppeThreshold = 90;
+      
+      if (complianceStatus.hardHat === 'warning' || complianceStatus.hardHat === 'critical') {
+        newAlerts.push(createAlert(
+          'hardHat',
+          ppeComplianceData.hardHat,
+          ppeThreshold,
+          `Hard Hat compliance at ${ppeComplianceData.hardHat}% - below ${ppeThreshold}% threshold`,
+          complianceStatus.hardHat === 'critical' ? 'medium' : 'low'
+        ));
+      }
+      
+      if (complianceStatus.safetyVests === 'warning' || complianceStatus.safetyVests === 'critical') {
+        newAlerts.push(createAlert(
+          'safetyVests',
+          ppeComplianceData.safetyVests,
+          ppeThreshold,
+          `Safety vest compliance at ${ppeComplianceData.safetyVests}% - below ${ppeThreshold}% threshold`,
+          complianceStatus.safetyVests === 'critical' ? 'medium' : 'low'
+        ));
+      }
+      
+      if (complianceStatus.protectiveGloves === 'warning' || complianceStatus.protectiveGloves === 'critical') {
+        newAlerts.push(createAlert(
+          'protectiveGloves',
+          ppeComplianceData.protectiveGloves,
+          ppeThreshold,
+          `Protective gloves compliance at ${ppeComplianceData.protectiveGloves}% - below ${ppeThreshold}% threshold`,
+          complianceStatus.protectiveGloves === 'critical' ? 'medium' : 'low'
+        ));
+      }
+      
+      return newAlerts;
+    };
+
+    // Update alerts
+    const interval = setInterval(() => {
+      const newAlerts = checkRealTimeAlerts();
+      
+      // Add new alerts only if they don't exist yet
+      if (newAlerts.length > 0) {
+        setActiveAlerts(prev => {
+          // Filter out duplicate alerts (same parameter within last 5 minutes)
+          const filteredNew = newAlerts.filter(newAlert => {
+            return !prev.some(existingAlert => 
+              existingAlert.parameter === newAlert.parameter && 
+              (new Date().getTime() - existingAlert.timestamp.getTime()) < 5 * 60 * 1000
+            );
+          });
+          
+          // Keep max 7 active alerts
+          return [...filteredNew, ...prev].slice(0, 7);
+        });
+      }
+      
+      // Randomly resolve some alerts
+      if (activeAlerts.length > 0 && Math.random() < 0.1) {
+        const alertToResolve = activeAlerts[Math.floor(Math.random() * activeAlerts.length)];
+        setActiveAlerts(prev => prev.filter(a => a.id !== alertToResolve.id));
+        setResolvedAlerts(prev => [alertToResolve, ...prev].slice(0, 5));
+      }
+    }, 5000);
+    
+    // Add initial alerts
+    setActiveAlerts([
+      {
+        id: 'alert-001',
+        equipmentId: 'pump-003',
+        timestamp: new Date(new Date().getTime() - 12 * 60000),
+        message: 'Wellhead temperature exceeding normal range',
+        parameter: 'temperature',
+        value: 78.2,
+        threshold: 75.0,
+        priority: 'medium',
+        isAcknowledged: false
+      },
+      {
+        id: 'alert-002',
+        equipmentId: 'comp-002',
+        timestamp: new Date(new Date().getTime() - 43 * 60000),
+        message: 'Corrosion rate increasing in section P-12',
+        parameter: 'corrosion',
+        value: 0.23,
+        threshold: 0.18,
+        priority: 'medium',
+        isAcknowledged: false
+      },
+      {
+        id: 'alert-003',
+        equipmentId: 'safety-system',
+        timestamp: new Date(new Date().getTime() - 72 * 60000),
+        message: 'PPE compliance at 89% - below 90% target',
+        parameter: 'compliance',
+        value: 89,
+        threshold: 90,
+        priority: 'low',
+        isAcknowledged: false
+      }
+    ]);
+
+    return () => clearInterval(interval);
+  }, [
+    isSimulating, 
+    monitoring.bopPressure.status, 
+    monitoring.wellheadTemperature.status,
+    monitoring.gasDetection.status,
+    monitoring.sealIntegrity.status,
+    monitoring.pipeCorrosion.status,
+    monitoring.nextMaintenance.status,
+    ppeComplianceData,
+    complianceStatus,
+    activeAlerts.length
+  ]);
+
+  // Mark all alerts as read
+  const markAllRead = () => {
+    setActiveAlerts(prev => prev.map(alert => ({ ...alert, isAcknowledged: true })));
+  };
+
+  // Dismiss a single alert
+  const dismissAlert = (id: string) => {
+    setActiveAlerts(prev => {
+      const alertToResolve = prev.find(a => a.id === id);
+      if (alertToResolve) {
+        setResolvedAlerts(resolved => [alertToResolve, ...resolved].slice(0, 5));
+      }
+      return prev.filter(a => a.id !== id);
+    });
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-vigia-bg text-foreground">
       <Header />
@@ -14,13 +226,26 @@ const Alerts: React.FC = () => {
           <div className="flex items-center justify-between mb-6">
             <h1 className="text-2xl font-bold">Safety Alerts</h1>
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" onClick={markAllRead}>
                 <CheckCircle className="h-4 w-4 mr-2" />
                 Mark All Read
               </Button>
-              <Button variant="outline" size="sm">
-                <Bell className="h-4 w-4 mr-2" />
-                Alert Settings
+              <Button 
+                variant={isSimulating ? "default" : "outline"} 
+                size="sm"
+                onClick={() => setIsSimulating(!isSimulating)}
+              >
+                {isSimulating ? (
+                  <>
+                    <BellDot className="h-4 w-4 mr-2" />
+                    Live Alerts
+                  </>
+                ) : (
+                  <>
+                    <Bell className="h-4 w-4 mr-2" />
+                    Enable Live
+                  </>
+                )}
               </Button>
             </div>
           </div>
@@ -32,32 +257,24 @@ const Alerts: React.FC = () => {
                 <h2 className="text-lg font-medium">Active Alerts</h2>
               </div>
               <span className="text-xs bg-vigia-warning/20 text-vigia-warning py-1 px-2 rounded-full">
-                3 Active
+                {activeAlerts.length} Active
               </span>
             </div>
             
             <div className="space-y-4">
-              <AlertItem
-                title="Abnormal Wellhead Temperature"
-                description="Temperature has increased by 12% in the last hour"
-                time="10 minutes ago"
-                level="critical"
-                type="system"
-              />
-              <AlertItem
-                title="PPE Compliance Warning"
-                description="Safety vest compliance below threshold (82%)"
-                time="35 minutes ago"
-                level="warning"
-                type="compliance"
-              />
-              <AlertItem
-                title="Pipe Corrosion Rate Above Threshold"
-                description="Corrosion rate at 0.23 mm/yr - above 0.2 mm/yr threshold"
-                time="1 hour ago"
-                level="warning"
-                type="maintenance"
-              />
+              {activeAlerts.length > 0 ? (
+                activeAlerts.map(alert => (
+                  <AlertItem 
+                    key={alert.id}
+                    alert={alert}
+                    onDismiss={() => dismissAlert(alert.id)}
+                  />
+                ))
+              ) : (
+                <div className="p-4 text-center text-muted-foreground">
+                  No active alerts
+                </div>
+              )}
             </div>
           </Card>
           
@@ -70,20 +287,19 @@ const Alerts: React.FC = () => {
             </div>
             
             <div className="space-y-4">
-              <AlertItem
-                title="Gas Detection Anomaly"
-                description="Temporary spike in gas levels - returned to normal"
-                time="Yesterday, 14:22"
-                level="resolved"
-                type="system"
-              />
-              <AlertItem
-                title="BOP Pressure Fluctuation"
-                description="Minor pressure fluctuation outside normal range"
-                time="Yesterday, 09:45"
-                level="resolved"
-                type="system"
-              />
+              {resolvedAlerts.length > 0 ? (
+                resolvedAlerts.map(alert => (
+                  <AlertItem 
+                    key={alert.id}
+                    alert={{...alert, isAcknowledged: true}}
+                    isResolved={true}
+                  />
+                ))
+              ) : (
+                <div className="p-4 text-center text-muted-foreground">
+                  No resolved alerts
+                </div>
+              )}
             </div>
           </Card>
         </div>
@@ -98,49 +314,65 @@ const Alerts: React.FC = () => {
 };
 
 interface AlertItemProps {
-  title: string;
-  description: string;
-  time: string;
-  level: 'critical' | 'warning' | 'info' | 'resolved';
-  type: 'system' | 'maintenance' | 'compliance';
+  alert: Alert;
+  onDismiss?: () => void;
+  isResolved?: boolean;
 }
 
-const AlertItem: React.FC<AlertItemProps> = ({ title, description, time, level, type }) => {
+const AlertItem: React.FC<AlertItemProps> = ({ alert, onDismiss, isResolved = false }) => {
   const getLevelIcon = () => {
-    switch (level) {
+    switch (alert.priority) {
       case 'critical':
         return <AlertTriangle className="h-5 w-5 text-red-500" />;
-      case 'warning':
+      case 'high':
+        return <AlertCircle className="h-5 w-5 text-red-500" />;
+      case 'medium':
         return <AlertCircle className="h-5 w-5 text-vigia-warning" />;
-      case 'info':
+      case 'low':
         return <Info className="h-5 w-5 text-blue-500" />;
-      case 'resolved':
-        return <CheckCircle className="h-5 w-5 text-vigia-success" />;
+      default:
+        return <Info className="h-5 w-5 text-blue-500" />;
     }
   };
   
   const getTypeLabel = () => {
-    switch (type) {
-      case 'system':
-        return 'System Alert';
-      case 'maintenance':
-        return 'Maintenance';
-      case 'compliance':
-        return 'Compliance';
-    }
+    if (alert.parameter.includes('pressure')) return 'Pressure';
+    if (alert.parameter.includes('temperature')) return 'Temperature';
+    if (alert.parameter.includes('gas')) return 'Gas Detection';
+    if (alert.parameter.includes('seal')) return 'Equipment';
+    if (alert.parameter.includes('corrosion')) return 'Maintenance';
+    if (alert.parameter.includes('maintenance')) return 'Maintenance';
+    if (alert.parameter.includes('Hat') || 
+        alert.parameter.includes('vest') || 
+        alert.parameter.includes('glass') || 
+        alert.parameter.includes('glove')) return 'Compliance';
+    return 'System';
   };
   
   const getLevelStyles = () => {
-    switch (level) {
+    switch (alert.priority) {
       case 'critical':
         return 'border-l-4 border-l-red-500 bg-red-500/5';
-      case 'warning':
+      case 'high':
+        return 'border-l-4 border-l-red-500 bg-red-500/5';
+      case 'medium':
         return 'border-l-4 border-l-vigia-warning bg-vigia-warning/5';
-      case 'info':
+      case 'low':
         return 'border-l-4 border-l-blue-500 bg-blue-500/5';
-      case 'resolved':
-        return 'border-l-4 border-l-vigia-success bg-vigia-success/5';
+      default:
+        return isResolved 
+          ? 'border-l-4 border-l-vigia-success bg-vigia-success/5' 
+          : 'border-l-4 border-l-blue-500 bg-blue-500/5';
     }
+  };
+
+  const getTimeString = (date: Date): string => {
+    const now = new Date();
+    const diffMinutes = Math.floor((now.getTime() - date.getTime()) / 60000);
+    
+    if (diffMinutes < 1) return 'just now';
+    if (diffMinutes < 60) return `${diffMinutes} min ago`;
+    return `${Math.floor(diffMinutes / 60)}h ${diffMinutes % 60}m ago`;
   };
 
   return (
@@ -148,20 +380,27 @@ const AlertItem: React.FC<AlertItemProps> = ({ title, description, time, level, 
       <div className="flex justify-between">
         <div className="flex items-center gap-2">
           {getLevelIcon()}
-          <h3 className="font-medium">{title}</h3>
+          <h3 className="font-medium">{alert.message}</h3>
         </div>
-        <Button variant="ghost" size="icon" className="h-6 w-6">
-          <X className="h-4 w-4" />
-        </Button>
+        {onDismiss && !isResolved && (
+          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onDismiss}>
+            <X className="h-4 w-4" />
+          </Button>
+        )}
       </div>
-      <p className="text-sm text-muted-foreground mt-1 ml-7">{description}</p>
+      <p className="text-sm text-muted-foreground mt-1 ml-7">
+        {alert.value.toFixed(1)} {alert.parameter.includes('temperature') ? '°C' : ''} 
+        {alert.parameter.includes('pressure') ? ' PSI' : ''}
+        {(alert.parameter.includes('Hat') || alert.parameter.includes('vest') || 
+          alert.parameter.includes('glass') || alert.parameter.includes('glove')) ? '%' : ''}
+      </p>
       <div className="flex items-center justify-between mt-2 ml-7">
         <span className="text-xs bg-vigia-muted/20 text-muted-foreground py-0.5 px-2 rounded-full">
           {getTypeLabel()}
         </span>
         <div className="flex items-center gap-1 text-xs text-muted-foreground">
           <Clock className="h-3 w-3" />
-          <span>{time}</span>
+          <span>{getTimeString(alert.timestamp)}</span>
         </div>
       </div>
     </div>

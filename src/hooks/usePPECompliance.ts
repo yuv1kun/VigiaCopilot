@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { simulatePPECompliance } from '@/utils/ppeComplianceUtils';
+import { simulatePPECompliance, determineComplianceStatus, calculateComplianceTrend } from '@/utils/ppeComplianceUtils';
 
 interface PPEComplianceData {
   hardHat: number;
@@ -23,6 +23,22 @@ export const usePPECompliance = (isActive: boolean, updateInterval: number = 200
     safetyGlasses: 100,
     safetyVests: 82,
     protectiveGloves: 78
+  });
+
+  // Status for each PPE item
+  const [complianceStatus, setComplianceStatus] = useState({
+    hardHat: determineComplianceStatus(96),
+    safetyGlasses: determineComplianceStatus(100),
+    safetyVests: determineComplianceStatus(82),
+    protectiveGloves: determineComplianceStatus(78)
+  });
+
+  // Trends for each PPE item
+  const [complianceTrends, setComplianceTrends] = useState({
+    hardHat: { value: 0, direction: 'flat' as const },
+    safetyGlasses: { value: 0, direction: 'flat' as const },
+    safetyVests: { value: 0, direction: 'flat' as const },
+    protectiveGloves: { value: 0, direction: 'flat' as const }
   });
 
   useEffect(() => {
@@ -48,6 +64,23 @@ export const usePPECompliance = (isActive: boolean, updateInterval: number = 200
           protectiveGloves: simulatePPECompliance(prevState.protectiveGloves, 'protectiveGloves')
         };
         
+        // Calculate trends
+        const trends = {
+          hardHat: calculateComplianceTrend(newData.hardHat, prevValues.hardHat),
+          safetyGlasses: calculateComplianceTrend(newData.safetyGlasses, prevValues.safetyGlasses),
+          safetyVests: calculateComplianceTrend(newData.safetyVests, prevValues.safetyVests),
+          protectiveGloves: calculateComplianceTrend(newData.protectiveGloves, prevValues.protectiveGloves)
+        };
+        setComplianceTrends(trends);
+        
+        // Update status
+        setComplianceStatus({
+          hardHat: determineComplianceStatus(newData.hardHat),
+          safetyGlasses: determineComplianceStatus(newData.safetyGlasses),
+          safetyVests: determineComplianceStatus(newData.safetyVests),
+          protectiveGloves: determineComplianceStatus(newData.protectiveGloves)
+        });
+        
         return newData;
       });
     }, updateInterval);
@@ -60,6 +93,8 @@ export const usePPECompliance = (isActive: boolean, updateInterval: number = 200
 
   return {
     ppeComplianceData,
+    complianceStatus,
+    complianceTrends,
     isActive
   };
 };
