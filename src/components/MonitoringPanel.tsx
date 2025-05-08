@@ -1,3 +1,4 @@
+
 import React from 'react';
 import StatusCard from './StatusCard';
 import { Gauge, Thermometer, AlertTriangle, Eye, Power, PowerOff, Shield, Info, Wrench } from 'lucide-react';
@@ -9,6 +10,9 @@ const MonitoringPanel: React.FC = () => {
     bopPressure, 
     wellheadTemperature, 
     gasDetection,
+    sealIntegrity,
+    pipeCorrosion,
+    nextMaintenance,
     isSimulating,
     toggleSimulation
   } = useRealTimeMonitoring(1000); // Update every second
@@ -64,24 +68,24 @@ const MonitoringPanel: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <StatusCard
             title="Seal Integrity"
-            value="96%"
-            status="normal"
+            value={sealIntegrity.formattedValue}
+            status={sealIntegrity.status}
             icon={<Shield className="h-4 w-4" />}
-            trend={{ value: "1", direction: 'down' }}
+            trend={sealIntegrity.trend}
           />
           <StatusCard
             title="Pipe Corrosion Est."
-            value="0.23 mm/yr"
-            status="warning"
+            value={pipeCorrosion.formattedValue}
+            status={pipeCorrosion.status}
             icon={<Info className="h-4 w-4" />}
-            trend={{ value: "5", direction: 'up' }}
+            trend={pipeCorrosion.trend}
           />
           <StatusCard
             title="Next Maintenance"
-            value="7 days"
-            status="normal"
+            value={nextMaintenance.formattedValue}
+            status={nextMaintenance.status}
             icon={<Wrench className="h-4 w-4" />}
-            trend={{ value: "0", direction: 'flat' }}
+            trend={nextMaintenance.trend}
           />
         </div>
       </div>

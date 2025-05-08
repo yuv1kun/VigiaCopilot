@@ -23,6 +23,27 @@ export const SAFETY_PARAMETERS = {
     baseline: 3.2,
     noiseLevel: 0.05, // 5% noise
     unit: "ppm"
+  },
+  sealIntegrity: {
+    min: 70,
+    max: 100,
+    baseline: 96,
+    noiseLevel: 0.01, // 1% noise
+    unit: "%"
+  },
+  pipeCorrosion: {
+    min: 0.05,
+    max: 0.5,
+    baseline: 0.23,
+    noiseLevel: 0.03, // 3% noise
+    unit: "mm/yr"
+  },
+  nextMaintenance: {
+    min: 1,
+    max: 30,
+    baseline: 7,
+    noiseLevel: 0.02, // 2% noise
+    unit: "days"
   }
 };
 
@@ -39,6 +60,18 @@ export const SAFETY_THRESHOLDS = {
   gasDetection: {
     warning: 5.0,
     alert: 7.5
+  },
+  sealIntegrity: {
+    warning: 85,
+    alert: 75
+  },
+  pipeCorrosion: {
+    warning: 0.30,
+    alert: 0.40
+  },
+  nextMaintenance: {
+    warning: 3,
+    alert: 1
   }
 };
 
@@ -107,16 +140,90 @@ export const simulateGasDetection = (currentValue: number, temperature: number):
                  Math.min(SAFETY_PARAMETERS.gasDetection.max, newValue));
 };
 
+// Simulate seal integrity with correlation to gas detection (gas leaks can indicate seal issues)
+export const simulateSealIntegrity = (currentIntegrity: number, gasDetection: number): number => {
+  // Gas detection correlation (higher gas = potential seal issues)
+  const gasEffect = (SAFETY_PARAMETERS.gasDetection.baseline - gasDetection) * 1.5;
+  
+  // Time-based degradation (seals naturally degrade over time)
+  const timeFactor = Math.sin(new Date().getTime() / 86400000) * 0.5;
+  
+  // Random noise component
+  const randomNoise = (Math.random() - 0.5) * SAFETY_PARAMETERS.sealIntegrity.noiseLevel * 2;
+  
+  // Calculate new integrity with high inertia (seals degrade slowly)
+  const newIntegrity = currentIntegrity * 0.98 + 
+                       (SAFETY_PARAMETERS.sealIntegrity.baseline + gasEffect + timeFactor + randomNoise) * 0.02;
+  
+  // Add realistic constraints
+  return Math.max(SAFETY_PARAMETERS.sealIntegrity.min, 
+                 Math.min(SAFETY_PARAMETERS.sealIntegrity.max, newIntegrity));
+};
+
+// Simulate pipe corrosion with correlation to temperature and time
+export const simulatePipeCorrosion = (currentCorrosion: number, temperature: number): number => {
+  // Temperature correlation (higher temperature accelerates corrosion)
+  const tempEffect = (temperature - SAFETY_PARAMETERS.wellheadTemperature.baseline) * 0.003;
+  
+  // Slow increasing trend (corrosion generally increases over time)
+  const timeTrend = Math.sin(new Date().getTime() / 8640000) * 0.01 + 0.005;
+  
+  // Random noise component
+  const randomNoise = (Math.random() - 0.5) * SAFETY_PARAMETERS.pipeCorrosion.baseline * SAFETY_PARAMETERS.pipeCorrosion.noiseLevel;
+  
+  // Calculate new corrosion rate with very high inertia (corrosion changes very slowly)
+  const newCorrosion = currentCorrosion * 0.99 + 
+                       (SAFETY_PARAMETERS.pipeCorrosion.baseline + tempEffect + timeTrend + randomNoise) * 0.01;
+  
+  // Add realistic constraints
+  return Math.max(SAFETY_PARAMETERS.pipeCorrosion.min, 
+                 Math.min(SAFETY_PARAMETERS.pipeCorrosion.max, newCorrosion));
+};
+
+// Simulate days until next maintenance based on seal integrity and pipe corrosion
+export const simulateMaintenanceDays = (currentDays: number, sealIntegrity: number, pipeCorrosion: number): number => {
+  // Calculate impact from seal integrity (lower integrity = sooner maintenance)
+  const sealImpact = (sealIntegrity - SAFETY_PARAMETERS.sealIntegrity.baseline) * 0.2;
+  
+  // Calculate impact from pipe corrosion (higher corrosion = sooner maintenance)
+  const corrosionImpact = (SAFETY_PARAMETERS.pipeCorrosion.baseline - pipeCorrosion) * 10;
+  
+  // Random variation (maintenance schedules can change based on resource availability)
+  const randomVariation = (Math.random() - 0.5) * 0.2;
+  
+  // Calculate new maintenance days with moderate inertia (schedules change with some stability)
+  const newDays = currentDays * 0.9 + 
+                  (SAFETY_PARAMETERS.nextMaintenance.baseline + sealImpact + corrosionImpact + randomVariation) * 0.1;
+  
+  // Add realistic constraints and round to whole days
+  return Math.max(SAFETY_PARAMETERS.nextMaintenance.min, 
+                 Math.min(SAFETY_PARAMETERS.nextMaintenance.max, Math.round(newDays)));
+};
+
 // Determine status based on value and thresholds
 export const determineStatus = (
   value: number, 
-  parameter: "bopPressure" | "wellheadTemperature" | "gasDetection"
+  parameter: keyof typeof SAFETY_THRESHOLDS
 ): "normal" | "warning" | "alert" | "inactive" => {
-  if (value >= SAFETY_THRESHOLDS[parameter].alert) {
-    return "alert";
-  } else if (value >= SAFETY_THRESHOLDS[parameter].warning) {
-    return "warning";
+  const thresholds = SAFETY_THRESHOLDS[parameter];
+  
+  // For parameters where higher values are better (like seal integrity)
+  if (parameter === 'sealIntegrity' || parameter === 'nextMaintenance') {
+    if (value <= thresholds.alert) {
+      return "alert";
+    } else if (value <= thresholds.warning) {
+      return "warning";
+    }
+  } 
+  // For parameters where lower values are better
+  else {
+    if (value >= thresholds.alert) {
+      return "alert";
+    } else if (value >= thresholds.warning) {
+      return "warning";
+    }
   }
+  
   return "normal";
 };
 
@@ -142,7 +249,7 @@ export const calculateTrend = (current: number, previous: number) => {
 // Format value with appropriate precision based on parameter type
 export const formatValue = (
   value: number, 
-  parameter: "bopPressure" | "wellheadTemperature" | "gasDetection"
+  parameter: keyof typeof SAFETY_PARAMETERS
 ): string => {
   switch (parameter) {
     case "bopPressure":
@@ -151,6 +258,12 @@ export const formatValue = (
       return `${value.toFixed(1)} ${SAFETY_PARAMETERS[parameter].unit}`;
     case "gasDetection":
       return `${value.toFixed(1)} ${SAFETY_PARAMETERS[parameter].unit}`;
+    case "sealIntegrity":
+      return `${value.toFixed(1)}${SAFETY_PARAMETERS[parameter].unit}`;
+    case "pipeCorrosion":
+      return `${value.toFixed(2)} ${SAFETY_PARAMETERS[parameter].unit}`;
+    case "nextMaintenance":
+      return `${Math.round(value)} ${SAFETY_PARAMETERS[parameter].unit}`;
     default:
       return `${value}`;
   }
@@ -158,21 +271,24 @@ export const formatValue = (
 
 // Generate alert based on parameter status
 export const generateAlert = (
-  parameter: "bopPressure" | "wellheadTemperature" | "gasDetection", 
+  parameter: keyof typeof SAFETY_THRESHOLDS, 
   value: number,
   threshold: number
 ): { message: string; priority: AlertPriority } => {
   let priority: AlertPriority = "low";
   let message = "";
   
-  // Determine priority based on how far over threshold
-  const percentOverThreshold = ((value - threshold) / threshold) * 100;
+  // Determine priority based on how far over/under threshold
+  const isHigherBetter = parameter === 'sealIntegrity' || parameter === 'nextMaintenance';
+  const percentDeviation = isHigherBetter 
+    ? ((threshold - value) / threshold) * 100 
+    : ((value - threshold) / threshold) * 100;
   
-  if (percentOverThreshold > 10) {
+  if (percentDeviation > 10) {
     priority = "critical";
-  } else if (percentOverThreshold > 5) {
+  } else if (percentDeviation > 5) {
     priority = "high";
-  } else if (percentOverThreshold > 2) {
+  } else if (percentDeviation > 2) {
     priority = "medium";
   }
   
@@ -186,6 +302,15 @@ export const generateAlert = (
       break;
     case "gasDetection":
       message = `Gas levels at ${value.toFixed(1)} ppm exceed safe threshold of ${threshold} ppm`;
+      break;
+    case "sealIntegrity":
+      message = `Seal integrity at ${value.toFixed(1)}% below safe threshold of ${threshold}%`;
+      break;
+    case "pipeCorrosion":
+      message = `Pipe corrosion rate at ${value.toFixed(2)} mm/yr exceeds safe threshold of ${threshold} mm/yr`;
+      break;
+    case "nextMaintenance":
+      message = `Maintenance required in ${Math.round(value)} days, below safe threshold of ${threshold} days`;
       break;
   }
   
