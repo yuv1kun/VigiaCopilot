@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,11 +23,10 @@ const Auth = () => {
   const [validationError, setValidationError] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  // Email validation function
+  // Enhanced email validation function - more permissive
   const validateEmail = (email: string) => {
-    // Basic email validation pattern
-    const emailPattern = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
-    return emailPattern.test(email);
+    // Very basic format checking - just ensure it has @ and a period
+    return email.includes('@') && email.includes('.') && email.length > 5;
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
@@ -36,14 +34,20 @@ const Auth = () => {
     setValidationError(null);
     setLoading(true);
 
-    // Validate email format first
-    if (!validateEmail(email)) {
-      setValidationError('Please enter a valid email address');
-      setLoading(false);
-      return;
-    }
-
     try {
+      // Simple client-side validation
+      if (!email || !password) {
+        setValidationError('Email and password are required');
+        setLoading(false);
+        return;
+      }
+      
+      if (password.length < 6) {
+        setValidationError('Password must be at least 6 characters');
+        setLoading(false);
+        return;
+      }
+
       // First create the authentication account
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
@@ -53,7 +57,18 @@ const Auth = () => {
         }
       });
 
-      if (authError) throw authError;
+      if (authError) {
+        console.error("Auth error:", authError);
+        
+        // Custom handling for email validation errors
+        if (authError.message.includes('email')) {
+          setValidationError('Email format not accepted by the server. Try a different email address.');
+        } else {
+          throw authError;
+        }
+        setLoading(false);
+        return;
+      }
       
       if (authData.user) {
         console.log("Auth user created:", authData.user.id);
@@ -72,24 +87,27 @@ const Auth = () => {
 
         if (profileError) {
           console.error("Profile error:", profileError);
-          throw profileError;
+          
+          // Handle RLS or other database errors
+          if (profileError.message.includes('policy')) {
+            setValidationError('Unable to create user profile due to permission issues. Please contact support.');
+          } else {
+            throw profileError;
+          }
+          setLoading(false);
+          return;
         }
         
         toast.success('Account created! Check your email for the confirmation link.');
         
-        // Optionally log in the user immediately if auto-confirm is enabled
-        // Uncomment if you want this behavior
-        // await supabase.auth.signInWithPassword({ email, password });
-        // navigate('/');
+        // Automatically sign in the user after successful signup
+        await supabase.auth.signInWithPassword({ email, password });
+        navigate('/');
       }
     } catch (error: any) {
       console.error('Sign up error:', error); 
-      // Handle specific Supabase auth errors
-      if (error.message.includes('email')) {
-        setValidationError(error.message);
-      } else {
-        toast.error(error.message || 'An error occurred during sign up');
-      }
+      // Generic error handling
+      toast.error(error.message || 'An error occurred during sign up');
     } finally {
       setLoading(false);
     }
@@ -100,20 +118,32 @@ const Auth = () => {
     setValidationError(null);
     setLoading(true);
 
-    // Validate email format first
-    if (!validateEmail(email)) {
-      setValidationError('Please enter a valid email address');
-      setLoading(false);
-      return;
-    }
-
     try {
+      if (!email || !password) {
+        setValidationError('Email and password are required');
+        setLoading(false);
+        return;
+      }
+
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Sign in error:", error);
+        
+        // Custom error messages based on error content
+        if (error.message.includes('email')) {
+          setValidationError('Invalid email format or email not registered');
+        } else if (error.message.includes('password')) {
+          setValidationError('Incorrect password');
+        } else {
+          throw error;
+        }
+        setLoading(false);
+        return;
+      }
       
       // Update last login time
       const { data: userData } = await supabase.auth.getUser();
@@ -128,12 +158,7 @@ const Auth = () => {
       navigate('/');
     } catch (error: any) {
       console.error('Sign in error:', error);
-      // Handle specific Supabase auth errors
-      if (error.message.includes('email')) {
-        setValidationError(error.message);
-      } else {
-        toast.error(error.message || 'Error signing in');
-      }
+      toast.error(error.message || 'Error signing in');
     } finally {
       setLoading(false);
     }
