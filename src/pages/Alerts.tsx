@@ -8,9 +8,11 @@ import { useRealTimeMonitoring } from '@/hooks/useRealTimeMonitoring';
 import { determineComplianceStatus } from '@/utils/ppeComplianceUtils';
 import { Alert, AlertPriority } from '@/types/equipment';
 import { generateAlert } from '@/utils/monitoringUtils';
+import { useToast } from '@/hooks/use-toast';
 
 const Alerts: React.FC = () => {
   const [isSimulating, setIsSimulating] = useState(true);
+  const { toast } = useToast();
   
   // Get real-time monitoring data
   const monitoring = useRealTimeMonitoring(1000);
@@ -21,6 +23,61 @@ const Alerts: React.FC = () => {
   // State to store generated alerts
   const [activeAlerts, setActiveAlerts] = useState<Alert[]>([]);
   const [resolvedAlerts, setResolvedAlerts] = useState<Alert[]>([]);
+
+  // Load alerts from localStorage
+  useEffect(() => {
+    const storedAlerts = localStorage.getItem('vigia-alerts');
+    if (storedAlerts) {
+      const allAlerts = JSON.parse(storedAlerts);
+      setActiveAlerts(allAlerts.filter((alert: Alert) => !alert.isAcknowledged));
+      setResolvedAlerts(allAlerts.filter((alert: Alert) => alert.isAcknowledged).slice(0, 5));
+    } else {
+      // Initialize with some sample alerts if none exist
+      const initialAlerts = [
+        {
+          id: 'alert-001',
+          equipmentId: 'pump-003',
+          timestamp: new Date(new Date().getTime() - 12 * 60000),
+          message: 'Wellhead temperature exceeding normal range',
+          parameter: 'temperature',
+          value: 78.2,
+          threshold: 75.0,
+          priority: 'medium' as AlertPriority,
+          isAcknowledged: false
+        },
+        {
+          id: 'alert-002',
+          equipmentId: 'comp-002',
+          timestamp: new Date(new Date().getTime() - 43 * 60000),
+          message: 'Corrosion rate increasing in section P-12',
+          parameter: 'corrosion',
+          value: 0.23,
+          threshold: 0.18,
+          priority: 'medium' as AlertPriority,
+          isAcknowledged: false
+        },
+        {
+          id: 'alert-003',
+          equipmentId: 'safety-system',
+          timestamp: new Date(new Date().getTime() - 72 * 60000),
+          message: 'PPE compliance at 89% - below 90% target',
+          parameter: 'compliance',
+          value: 89,
+          threshold: 90,
+          priority: 'low' as AlertPriority,
+          isAcknowledged: false
+        }
+      ];
+      
+      localStorage.setItem('vigia-alerts', JSON.stringify(initialAlerts));
+      setActiveAlerts(initialAlerts);
+    }
+    
+    // Clear the forceHideBadge parameter if it exists
+    if (window.location.search.includes('forceHideBadge=true')) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
 
   // Generate alerts based on monitoring data
   useEffect(() => {
@@ -134,60 +191,44 @@ const Alerts: React.FC = () => {
           const filteredNew = newAlerts.filter(newAlert => {
             return !prev.some(existingAlert => 
               existingAlert.parameter === newAlert.parameter && 
-              (new Date().getTime() - existingAlert.timestamp.getTime()) < 5 * 60 * 1000
+              (new Date().getTime() - new Date(existingAlert.timestamp).getTime()) < 5 * 60 * 1000
             );
           });
           
-          // Keep max 7 active alerts
-          return [...filteredNew, ...prev].slice(0, 7);
+          if (filteredNew.length > 0) {
+            // Update localStorage with new alerts
+            const storedAlerts = localStorage.getItem('vigia-alerts') 
+              ? JSON.parse(localStorage.getItem('vigia-alerts') || '[]')
+              : [];
+            
+            const updatedAlerts = [...filteredNew, ...storedAlerts];
+            localStorage.setItem('vigia-alerts', JSON.stringify(updatedAlerts));
+            
+            // Show toast for high priority alerts
+            filteredNew.forEach(alert => {
+              if (alert.priority === 'high' || alert.priority === 'critical') {
+                toast({
+                  title: "New Alert",
+                  description: alert.message,
+                  variant: "destructive",
+                });
+              }
+            });
+            
+            // Keep max 10 active alerts
+            return [...filteredNew, ...prev].slice(0, 10);
+          }
+          
+          return prev;
         });
       }
       
       // Randomly resolve some alerts
       if (activeAlerts.length > 0 && Math.random() < 0.1) {
-        const alertToResolve = activeAlerts[Math.floor(Math.random() * activeAlerts.length)];
-        setActiveAlerts(prev => prev.filter(a => a.id !== alertToResolve.id));
-        setResolvedAlerts(prev => [alertToResolve, ...prev].slice(0, 5));
+        dismissAlert(activeAlerts[Math.floor(Math.random() * activeAlerts.length)].id);
       }
-    }, 5000);
+    }, 8000);
     
-    // Add initial alerts
-    setActiveAlerts([
-      {
-        id: 'alert-001',
-        equipmentId: 'pump-003',
-        timestamp: new Date(new Date().getTime() - 12 * 60000),
-        message: 'Wellhead temperature exceeding normal range',
-        parameter: 'temperature',
-        value: 78.2,
-        threshold: 75.0,
-        priority: 'medium',
-        isAcknowledged: false
-      },
-      {
-        id: 'alert-002',
-        equipmentId: 'comp-002',
-        timestamp: new Date(new Date().getTime() - 43 * 60000),
-        message: 'Corrosion rate increasing in section P-12',
-        parameter: 'corrosion',
-        value: 0.23,
-        threshold: 0.18,
-        priority: 'medium',
-        isAcknowledged: false
-      },
-      {
-        id: 'alert-003',
-        equipmentId: 'safety-system',
-        timestamp: new Date(new Date().getTime() - 72 * 60000),
-        message: 'PPE compliance at 89% - below 90% target',
-        parameter: 'compliance',
-        value: 89,
-        threshold: 90,
-        priority: 'low',
-        isAcknowledged: false
-      }
-    ]);
-
     return () => clearInterval(interval);
   }, [
     isSimulating, 
@@ -199,23 +240,63 @@ const Alerts: React.FC = () => {
     monitoring.nextMaintenance.status,
     ppeComplianceData,
     complianceStatus,
-    activeAlerts.length
+    activeAlerts.length,
+    toast
   ]);
+
+  // Listen for storage events from other components
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'vigia-alerts') {
+        const allAlerts = e.newValue ? JSON.parse(e.newValue) : [];
+        setActiveAlerts(allAlerts.filter((alert: Alert) => !alert.isAcknowledged));
+        setResolvedAlerts(allAlerts.filter((alert: Alert) => alert.isAcknowledged).slice(0, 5));
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
 
   // Mark all alerts as read
   const markAllRead = () => {
-    setActiveAlerts(prev => prev.map(alert => ({ ...alert, isAcknowledged: true })));
+    const storedAlerts = localStorage.getItem('vigia-alerts')
+      ? JSON.parse(localStorage.getItem('vigia-alerts') || '[]')
+      : [];
+    
+    const updatedAlerts = storedAlerts.map((alert: Alert) => ({
+      ...alert,
+      isAcknowledged: true
+    }));
+    
+    localStorage.setItem('vigia-alerts', JSON.stringify(updatedAlerts));
+    setResolvedAlerts(prev => [...activeAlerts, ...prev].slice(0, 10));
+    setActiveAlerts([]);
+    
+    // Trigger storage event for other components
+    window.dispatchEvent(new Event('storage'));
   };
 
   // Dismiss a single alert
   const dismissAlert = (id: string) => {
-    setActiveAlerts(prev => {
-      const alertToResolve = prev.find(a => a.id === id);
-      if (alertToResolve) {
-        setResolvedAlerts(resolved => [alertToResolve, ...resolved].slice(0, 5));
-      }
-      return prev.filter(a => a.id !== id);
-    });
+    const storedAlerts = localStorage.getItem('vigia-alerts')
+      ? JSON.parse(localStorage.getItem('vigia-alerts') || '[]')
+      : [];
+    
+    const alertToResolve = activeAlerts.find(a => a.id === id);
+    
+    if (alertToResolve) {
+      const updatedAlerts = storedAlerts.map((alert: Alert) => 
+        alert.id === id ? { ...alert, isAcknowledged: true } : alert
+      );
+      
+      localStorage.setItem('vigia-alerts', JSON.stringify(updatedAlerts));
+      setActiveAlerts(prev => prev.filter(a => a.id !== id));
+      setResolvedAlerts(prev => [alertToResolve, ...prev].slice(0, 10));
+      
+      // Trigger storage event for other components
+      window.dispatchEvent(new Event('storage'));
+    }
   };
 
   return (
@@ -226,7 +307,7 @@ const Alerts: React.FC = () => {
           <div className="flex items-center justify-between mb-6">
             <h1 className="text-2xl font-bold">Safety Alerts</h1>
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={markAllRead}>
+              <Button variant="outline" size="sm" onClick={markAllRead} disabled={activeAlerts.length === 0}>
                 <CheckCircle className="h-4 w-4 mr-2" />
                 Mark All Read
               </Button>
