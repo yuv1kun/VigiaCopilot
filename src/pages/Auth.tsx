@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,7 +24,7 @@ const Auth = () => {
   const [validationError, setValidationError] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  // Super permissive email validation - just check for @ symbol
+  // Super simple email validation - just check for @ symbol
   const validateEmail = (email: string) => {
     return email.includes('@');
   };
@@ -47,6 +48,13 @@ const Auth = () => {
         return;
       }
 
+      // Extremely basic email validation - just make sure it has an @ symbol
+      if (!validateEmail(email)) {
+        setValidationError('Please include an @ symbol in your email');
+        setLoading(false);
+        return;
+      }
+
       console.log("Attempting to sign up with:", email);
       
       // First create the authentication account
@@ -61,7 +69,7 @@ const Auth = () => {
       if (authError) {
         console.error("Auth error:", authError);
         
-        // Better error handling
+        // Better error handling with details from Supabase
         if (authError.message.includes('email')) {
           setValidationError(`Email error: ${authError.message}`);
         } else {
@@ -175,9 +183,9 @@ const Auth = () => {
     e.preventDefault();
     setValidationError(null);
 
-    // Validate email format
+    // Super simple email validation - just check for @ symbol
     if (!validateEmail(email)) {
-      setValidationError('Please enter a valid email address');
+      setValidationError('Please include an @ symbol in your email');
       return;
     }
 
@@ -292,7 +300,7 @@ const Auth = () => {
                       required
                     />
                     <p className="text-xs text-muted-foreground">
-                      Use a valid email format, e.g., name@example.com
+                      Use any email format with an @ symbol
                     </p>
                   </div>
                   

@@ -35,6 +35,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const refreshSession = async () => {
     try {
+      console.log('Refreshing session...');
       const { data, error } = await supabase.auth.getSession();
       
       if (error) {
@@ -42,6 +43,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
       
+      console.log('Session refreshed:', data.session ? 'Session exists' : 'No session');
       setSession(data.session);
       setUser(data.session?.user ?? null);
     } catch (error) {
@@ -53,6 +55,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Get initial session
     const getInitialSession = async () => {
       try {
+        console.log('Fetching initial session...');
         const { data, error } = await supabase.auth.getSession();
         
         if (error) {
@@ -61,6 +64,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return;
         }
         
+        console.log('Initial session:', data.session ? 'Session exists' : 'No session');
         setSession(data.session);
         setUser(data.session?.user ?? null);
       } catch (error) {

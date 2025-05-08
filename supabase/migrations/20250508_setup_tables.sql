@@ -10,4 +10,8 @@ SET
   enable_email_domain_allowlist = false,
   enable_email_domain_blocklist = false,
   -- Disable email confirmation requirement for faster testing
-  enable_confirmations = false;
+  enable_confirmations = false,
+  -- IMPORTANT: Set the email validation regex to be extremely permissive
+  -- This will accept any string containing an @ symbol
+  email_regex = '^.+@.+$';
+
