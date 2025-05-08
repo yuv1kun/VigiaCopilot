@@ -1,35 +1,60 @@
-
 import React from 'react';
 import StatusCard from './StatusCard';
-import { Gauge, Thermometer, Triangle, Eye, Bell, HardDrive, Info, Shield, Wrench } from 'lucide-react';
+import { Gauge, Thermometer, AlertTriangle, Eye, Power, PowerOff, Shield, Info, Wrench } from 'lucide-react';
 import { Card } from '@/components/ui/card';
+import { useRealTimeMonitoring } from '@/hooks/useRealTimeMonitoring';
 
 const MonitoringPanel: React.FC = () => {
+  const { 
+    bopPressure, 
+    wellheadTemperature, 
+    gasDetection,
+    isSimulating,
+    toggleSimulation
+  } = useRealTimeMonitoring(1000); // Update every second
+  
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-medium mb-4">Real-Time Equipment & Safety Monitoring</h2>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-lg font-medium">Real-Time Equipment & Safety Monitoring</h2>
+          <button 
+            onClick={toggleSimulation}
+            className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs
+              ${isSimulating ? 'bg-vigia-success/20 text-vigia-success' : 'bg-vigia-muted/30 text-muted-foreground'}`}
+          >
+            {isSimulating ? (
+              <>
+                <Power className="h-3 w-3" /> Live Data
+              </>
+            ) : (
+              <>
+                <PowerOff className="h-3 w-3" /> Paused
+              </>
+            )}
+          </button>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <StatusCard
             title="BOP Pressure"
-            value="1420 PSI"
-            status="normal"
+            value={bopPressure.formattedValue}
+            status={bopPressure.status}
             icon={<Gauge className="h-4 w-4" />}
-            trend={{ value: 2, direction: 'up' }}
+            trend={bopPressure.trend}
           />
           <StatusCard
             title="Wellhead Temperature"
-            value="85°C"
-            status="warning"
+            value={wellheadTemperature.formattedValue}
+            status={wellheadTemperature.status}
             icon={<Thermometer className="h-4 w-4" />}
-            trend={{ value: 12, direction: 'up' }}
+            trend={wellheadTemperature.trend}
           />
           <StatusCard
             title="Gas Detection"
-            value="3.2 ppm"
-            status="normal"
-            icon={<Triangle className="h-4 w-4" />}
-            trend={{ value: 0, direction: 'flat' }}
+            value={gasDetection.formattedValue}
+            status={gasDetection.status}
+            icon={<AlertTriangle className="h-4 w-4" />}
+            trend={gasDetection.trend}
           />
         </div>
       </div>
