@@ -1,7 +1,7 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import StatusCard from './StatusCard';
-import { Gauge, Thermometer, AlertTriangle, Eye, Power, PowerOff, Shield, Info, Wrench, HardHat, Glasses, Shirt, Hand } from 'lucide-react';
+import { Gauge, Thermometer, AlertTriangle, Eye, Power, PowerOff, Shield, Info, Wrench, HardHat, Glasses, Shirt, Hand, BarChart3 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { useRealTimeMonitoring } from '@/hooks/useRealTimeMonitoring';
 import { usePPECompliance } from '@/hooks/usePPECompliance';
@@ -15,10 +15,12 @@ const MonitoringPanel: React.FC = () => {
     pipeCorrosion,
     nextMaintenance,
     isSimulating,
-    toggleSimulation
+    toggleSimulation,
+    activeScenario
   } = useRealTimeMonitoring(1000); // Update every second
   
   const { ppeComplianceData, isActive } = usePPECompliance(isSimulating, 2000); // Update every 2 seconds
+  const [showScenarioInfo, setShowScenarioInfo] = useState(false);
   
   return (
     <div className="space-y-6">
@@ -67,7 +69,29 @@ const MonitoringPanel: React.FC = () => {
       </div>
       
       <div>
-        <h2 className="text-lg font-medium mb-4">Predictive Maintenance & Corrosion</h2>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-lg font-medium">Predictive Maintenance & Corrosion</h2>
+          {activeScenario && (
+            <div className="relative">
+              <button 
+                onClick={() => setShowScenarioInfo(!showScenarioInfo)}
+                className="flex items-center gap-2 px-3 py-1 rounded-full text-xs bg-vigia-teal/20 text-vigia-teal"
+              >
+                <BarChart3 className="h-3 w-3" /> Active Scenario
+              </button>
+              {showScenarioInfo && (
+                <div className="absolute right-0 mt-2 bg-vigia-card border border-border rounded-md p-3 shadow-lg z-10 w-64">
+                  <h4 className="font-medium text-sm mb-1">{activeScenario.title}</h4>
+                  <p className="text-xs text-muted-foreground">{activeScenario.description}</p>
+                  <div className="text-xs mt-2 flex items-center justify-between">
+                    <span>Duration:</span>
+                    <span className="text-vigia-teal">{activeScenario.duration}s</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <StatusCard
             title="Seal Integrity"
@@ -75,6 +99,7 @@ const MonitoringPanel: React.FC = () => {
             status={sealIntegrity.status}
             icon={<Shield className="h-4 w-4" />}
             trend={sealIntegrity.trend}
+            className={activeScenario?.affects.includes('sealIntegrity') ? 'border-vigia-teal/50' : ''}
           />
           <StatusCard
             title="Pipe Corrosion Est."
@@ -82,6 +107,7 @@ const MonitoringPanel: React.FC = () => {
             status={pipeCorrosion.status}
             icon={<Info className="h-4 w-4" />}
             trend={pipeCorrosion.trend}
+            className={activeScenario?.affects.includes('pipeCorrosion') ? 'border-vigia-teal/50' : ''}
           />
           <StatusCard
             title="Next Maintenance"
@@ -89,6 +115,7 @@ const MonitoringPanel: React.FC = () => {
             status={nextMaintenance.status}
             icon={<Wrench className="h-4 w-4" />}
             trend={nextMaintenance.trend}
+            className={activeScenario?.affects.includes('nextMaintenance') ? 'border-vigia-teal/50' : ''}
           />
         </div>
       </div>

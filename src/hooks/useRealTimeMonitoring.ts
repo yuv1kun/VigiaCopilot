@@ -35,6 +35,79 @@ interface MonitoringState {
   isSimulating: boolean;
 }
 
+// Define scenario interface
+interface Scenario {
+  id: string;
+  title: string;
+  description: string;
+  duration: number; // in seconds
+  affects: Array<'bopPressure' | 'wellheadTemperature' | 'gasDetection' | 'sealIntegrity' | 'pipeCorrosion' | 'nextMaintenance'>;
+  modifiers: {
+    [key: string]: (value: number, progress: number) => number;
+  };
+}
+
+// Predefined maintenance scenarios
+const MAINTENANCE_SCENARIOS: Scenario[] = [
+  {
+    id: 'seal-deterioration',
+    title: 'Seal Deterioration Event',
+    description: 'Gradual seal integrity decline detected, indicating potential leakage risk',
+    duration: 30,
+    affects: ['sealIntegrity', 'gasDetection'],
+    modifiers: {
+      sealIntegrity: (value, progress) => value - (12 * Math.sin(progress * Math.PI)),
+      gasDetection: (value, progress) => value + (1.5 * Math.sin(progress * Math.PI))
+    }
+  },
+  {
+    id: 'corrosion-acceleration',
+    title: 'Corrosion Rate Spike',
+    description: 'Localized increase in pipe corrosion detected, triggering early maintenance alert',
+    duration: 25,
+    affects: ['pipeCorrosion', 'nextMaintenance'],
+    modifiers: {
+      pipeCorrosion: (value, progress) => value + (0.15 * Math.sin(progress * Math.PI)),
+      nextMaintenance: (value, progress) => Math.max(1, value - (5 * progress))
+    }
+  },
+  {
+    id: 'emergency-maintenance',
+    title: 'Emergency Maintenance Required',
+    description: 'Multiple systems indicating immediate maintenance needs',
+    duration: 40,
+    affects: ['sealIntegrity', 'pipeCorrosion', 'nextMaintenance'],
+    modifiers: {
+      sealIntegrity: (value, progress) => value - (15 * progress),
+      pipeCorrosion: (value, progress) => value + (0.2 * progress),
+      nextMaintenance: (value, progress) => 1 // Force immediate maintenance
+    }
+  },
+  {
+    id: 'preventive-action',
+    title: 'Preventive Maintenance Success',
+    description: 'Recent maintenance improving system health metrics',
+    duration: 35,
+    affects: ['sealIntegrity', 'pipeCorrosion', 'nextMaintenance'],
+    modifiers: {
+      sealIntegrity: (value, progress) => Math.min(SAFETY_PARAMETERS.sealIntegrity.max, value + (10 * progress)),
+      pipeCorrosion: (value, progress) => Math.max(SAFETY_PARAMETERS.pipeCorrosion.min, value - (0.1 * progress)),
+      nextMaintenance: (value, progress) => Math.min(SAFETY_PARAMETERS.nextMaintenance.max, value + (10 * progress))
+    }
+  },
+  {
+    id: 'material-fatigue',
+    title: 'Material Fatigue Detection',
+    description: 'Sensors detecting unusual wear patterns in critical components',
+    duration: 28,
+    affects: ['sealIntegrity', 'pipeCorrosion'],
+    modifiers: {
+      sealIntegrity: (value, progress) => value - (8 * Math.sin(progress * Math.PI * 2)),
+      pipeCorrosion: (value, progress) => value + (0.12 * (1 - Math.cos(progress * Math.PI)))
+    }
+  }
+];
+
 export const useRealTimeMonitoring = (updateInterval: number = 1000) => {
   const [monitoringState, setMonitoringState] = useState<MonitoringState>({
     bopPressure: {
@@ -106,6 +179,10 @@ export const useRealTimeMonitoring = (updateInterval: number = 1000) => {
     recoveryPhase: 0,
   });
 
+  // Track maintenance specific scenarios
+  const [currentMaintenanceScenario, setCurrentMaintenanceScenario] = useState<Scenario | null>(null);
+  const [maintenanceScenarioProgress, setMaintenanceScenarioProgress] = useState(0);
+
   useEffect(() => {
     if (!monitoringState.isSimulating) return;
     
@@ -120,6 +197,37 @@ export const useRealTimeMonitoring = (updateInterval: number = 1000) => {
         nextMaintenance: monitoringState.nextMaintenance.value
       });
     }, 10000);
+    
+    // Maintenance scenario management
+    const maintenanceScenarioInterval = setInterval(() => {
+      if (!currentMaintenanceScenario && Math.random() < 0.15) { // 15% chance every 12 seconds
+        // Select a random maintenance scenario
+        const randomScenario = MAINTENANCE_SCENARIOS[Math.floor(Math.random() * MAINTENANCE_SCENARIOS.length)];
+        setCurrentMaintenanceScenario(randomScenario);
+        setMaintenanceScenarioProgress(0);
+        
+        // Show toast notification
+        toast.info(randomScenario.title, {
+          description: randomScenario.description,
+          position: "top-right",
+        });
+      } else if (currentMaintenanceScenario) {
+        // Update scenario progress
+        setMaintenanceScenarioProgress(prog => {
+          const newProgress = prog + (1 / (currentMaintenanceScenario.duration / 2)); // Progress in 0-1 range
+          if (newProgress >= 1) {
+            // Scenario completed
+            toast.success(`${currentMaintenanceScenario.title} resolved`, {
+              description: "Systems returning to normal parameters",
+              position: "top-right",
+            });
+            setCurrentMaintenanceScenario(null);
+            return 0;
+          }
+          return newProgress;
+        });
+      }
+    }, 2000);
     
     // Randomly trigger realistic scenarios
     const scenarioInterval = setInterval(() => {
@@ -296,20 +404,38 @@ export const useRealTimeMonitoring = (updateInterval: number = 1000) => {
         const newWellheadTemp = simulateWellheadTemperature(prevState.wellheadTemperature.value, newBOPPressure) + wellheadTempModifier;
         const newGasDetection = simulateGasDetection(prevState.gasDetection.value, newWellheadTemp) + gasDetectionModifier;
         
-        // Simulate maintenance metrics with correlations to operational data and scenario modifiers
-        const newSealIntegrity = Math.max(
-          SAFETY_PARAMETERS.sealIntegrity.min,
-          simulateSealIntegrity(prevState.sealIntegrity.value, newGasDetection) + sealIntegrityModifier
-        );
-        const newPipeCorrosion = Math.min(
-          SAFETY_PARAMETERS.pipeCorrosion.max,
-          simulatePipeCorrosion(prevState.pipeCorrosion.value, newWellheadTemp) + pipeCorrosionModifier
-        );
-        const newNextMaintenance = simulateMaintenanceDays(
-          prevState.nextMaintenance.value, 
-          newSealIntegrity, 
-          newPipeCorrosion
-        );
+        // Apply maintenance scenario effects
+        let newSealIntegrity = simulateSealIntegrity(prevState.sealIntegrity.value, newGasDetection) + sealIntegrityModifier;
+        let newPipeCorrosion = simulatePipeCorrosion(prevState.pipeCorrosion.value, newWellheadTemp) + pipeCorrosionModifier;
+        let newNextMaintenance = simulateMaintenanceDays(prevState.nextMaintenance.value, newSealIntegrity, newPipeCorrosion);
+
+        // Apply maintenance-specific scenario modifiers if active
+        if (currentMaintenanceScenario) {
+          const scenario = currentMaintenanceScenario;
+          const progress = maintenanceScenarioProgress;
+          
+          if (scenario.affects.includes('sealIntegrity') && scenario.modifiers.sealIntegrity) {
+            newSealIntegrity = scenario.modifiers.sealIntegrity(newSealIntegrity, progress);
+          }
+          
+          if (scenario.affects.includes('pipeCorrosion') && scenario.modifiers.pipeCorrosion) {
+            newPipeCorrosion = scenario.modifiers.pipeCorrosion(newPipeCorrosion, progress);
+          }
+          
+          if (scenario.affects.includes('nextMaintenance') && scenario.modifiers.nextMaintenance) {
+            newNextMaintenance = scenario.modifiers.nextMaintenance(newNextMaintenance, progress);
+          }
+          
+          // Ensure values stay within allowed ranges
+          newSealIntegrity = Math.max(SAFETY_PARAMETERS.sealIntegrity.min, 
+                                     Math.min(SAFETY_PARAMETERS.sealIntegrity.max, newSealIntegrity));
+          
+          newPipeCorrosion = Math.max(SAFETY_PARAMETERS.pipeCorrosion.min, 
+                                     Math.min(SAFETY_PARAMETERS.pipeCorrosion.max, newPipeCorrosion));
+          
+          newNextMaintenance = Math.max(SAFETY_PARAMETERS.nextMaintenance.min, 
+                                      Math.min(SAFETY_PARAMETERS.nextMaintenance.max, newNextMaintenance));
+        }
         
         // Calculate trends based on stored previous values
         const bopTrend = calculateTrend(newBOPPressure, prevValues.bopPressure);
@@ -323,6 +449,9 @@ export const useRealTimeMonitoring = (updateInterval: number = 1000) => {
         const bopStatus = determineStatus(newBOPPressure, 'bopPressure');
         const tempStatus = determineStatus(newWellheadTemp, 'wellheadTemperature');
         const gasStatus = determineStatus(newGasDetection, 'gasDetection');
+        const sealStatus = determineStatus(newSealIntegrity, 'sealIntegrity');
+        const corrosionStatus = determineStatus(newPipeCorrosion, 'pipeCorrosion');
+        const maintenanceStatus = determineStatus(newNextMaintenance, 'nextMaintenance');
         
         // Generate alerts for status changes from normal to warning or alert
         if (bopStatus !== prevState.bopPressure.status) {
@@ -367,6 +496,48 @@ export const useRealTimeMonitoring = (updateInterval: number = 1000) => {
           }
         }
         
+        if (sealStatus !== prevState.sealIntegrity.status) {
+          if (sealStatus === 'warning' || sealStatus === 'alert') {
+            const threshold = sealStatus === 'warning' ? 
+              SAFETY_THRESHOLDS.sealIntegrity.warning : 
+              SAFETY_THRESHOLDS.sealIntegrity.alert;
+              
+            const alert = generateAlert('sealIntegrity', newSealIntegrity, threshold);
+            toast[sealStatus === 'alert' ? 'error' : 'warning'](alert.message, {
+              position: sealStatus === 'alert' ? 'top-center' : 'top-right',
+              duration: sealStatus === 'alert' ? 7000 : 5000,
+            });
+          }
+        }
+        
+        if (corrosionStatus !== prevState.pipeCorrosion.status) {
+          if (corrosionStatus === 'warning' || corrosionStatus === 'alert') {
+            const threshold = corrosionStatus === 'warning' ? 
+              SAFETY_THRESHOLDS.pipeCorrosion.warning : 
+              SAFETY_THRESHOLDS.pipeCorrosion.alert;
+              
+            const alert = generateAlert('pipeCorrosion', newPipeCorrosion, threshold);
+            toast[corrosionStatus === 'alert' ? 'error' : 'warning'](alert.message, {
+              position: corrosionStatus === 'alert' ? 'top-center' : 'top-right',
+              duration: corrosionStatus === 'alert' ? 7000 : 5000,
+            });
+          }
+        }
+        
+        if (maintenanceStatus !== prevState.nextMaintenance.status) {
+          if (maintenanceStatus === 'warning' || maintenanceStatus === 'alert') {
+            const threshold = maintenanceStatus === 'warning' ? 
+              SAFETY_THRESHOLDS.nextMaintenance.warning : 
+              SAFETY_THRESHOLDS.nextMaintenance.alert;
+              
+            const alert = generateAlert('nextMaintenance', newNextMaintenance, threshold);
+            toast[maintenanceStatus === 'alert' ? 'error' : 'warning'](alert.message, {
+              position: maintenanceStatus === 'alert' ? 'top-center' : 'top-right',
+              duration: maintenanceStatus === 'alert' ? 7000 : 5000,
+            });
+          }
+        }
+        
         return {
           ...prevState,
           bopPressure: {
@@ -390,19 +561,19 @@ export const useRealTimeMonitoring = (updateInterval: number = 1000) => {
           sealIntegrity: {
             value: newSealIntegrity,
             formattedValue: formatValue(newSealIntegrity, 'sealIntegrity'),
-            status: determineStatus(newSealIntegrity, 'sealIntegrity'),
+            status: sealStatus,
             trend: sealTrend
           },
           pipeCorrosion: {
             value: newPipeCorrosion,
             formattedValue: formatValue(newPipeCorrosion, 'pipeCorrosion'),
-            status: determineStatus(newPipeCorrosion, 'pipeCorrosion'),
+            status: corrosionStatus,
             trend: corrosionTrend
           },
           nextMaintenance: {
             value: newNextMaintenance,
             formattedValue: formatValue(newNextMaintenance, 'nextMaintenance'),
-            status: determineStatus(newNextMaintenance, 'nextMaintenance'),
+            status: maintenanceStatus,
             trend: maintenanceTrend
           }
         };
@@ -413,8 +584,9 @@ export const useRealTimeMonitoring = (updateInterval: number = 1000) => {
       clearInterval(dataInterval);
       clearInterval(trendInterval);
       clearInterval(scenarioInterval);
+      clearInterval(maintenanceScenarioInterval);
     };
-  }, [monitoringState.isSimulating, updateInterval, prevValues, activeScenarios, scenarioTimers]);
+  }, [monitoringState.isSimulating, updateInterval, prevValues, activeScenarios, scenarioTimers, currentMaintenanceScenario, maintenanceScenarioProgress]);
 
   const toggleSimulation = () => {
     setMonitoringState(prevState => ({
@@ -425,6 +597,7 @@ export const useRealTimeMonitoring = (updateInterval: number = 1000) => {
 
   return {
     ...monitoringState,
-    toggleSimulation
+    toggleSimulation,
+    activeScenario: currentMaintenanceScenario
   };
 };
