@@ -15,3 +15,8 @@ SET
   -- This will accept any string containing an @ symbol
   email_regex = '^.+@.+$';
 
+-- Explicitly disable all email validation for testing purposes
+INSERT INTO auth.config (key, value)
+VALUES ('DISABLE_EMAIL_VALIDATION', 'true')
+ON CONFLICT (key) DO UPDATE SET value = 'true';
+

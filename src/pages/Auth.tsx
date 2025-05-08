@@ -24,9 +24,11 @@ const Auth = () => {
   const [validationError, setValidationError] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  // Super simple email validation - just check for @ symbol
+  // Skip all email validation - let Supabase handle it with our permissive config
+  // We only need to ensure there's some text before and after an @ symbol
   const validateEmail = (email: string) => {
-    return email.includes('@');
+    const parts = email.split('@');
+    return parts.length === 2 && parts[0].length > 0 && parts[1].length > 0;
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
@@ -48,20 +50,25 @@ const Auth = () => {
         return;
       }
 
-      // Extremely basic email validation - just make sure it has an @ symbol
+      // Basic email validation - just make sure it has text before and after an @ symbol
       if (!validateEmail(email)) {
-        setValidationError('Please include an @ symbol in your email');
+        setValidationError('Please enter text before and after the @ symbol');
         setLoading(false);
         return;
       }
 
       console.log("Attempting to sign up with:", email);
       
-      // First create the authentication account
+      // First create the authentication account with debug options
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
         options: {
+          data: {
+            name,
+            role,
+            phone
+          },
           emailRedirectTo: window.location.origin
         }
       });
@@ -69,9 +76,12 @@ const Auth = () => {
       if (authError) {
         console.error("Auth error:", authError);
         
-        // Better error handling with details from Supabase
+        // Detailed error handling
         if (authError.message.includes('email')) {
           setValidationError(`Email error: ${authError.message}`);
+          console.log("Email validation failed:", email);
+          // Show all available error details for debugging
+          console.log("Full error object:", JSON.stringify(authError));
         } else {
           setValidationError(authError.message);
         }
@@ -183,9 +193,9 @@ const Auth = () => {
     e.preventDefault();
     setValidationError(null);
 
-    // Super simple email validation - just check for @ symbol
+    // Skip complex validation - just ensure it has text before and after @ symbol
     if (!validateEmail(email)) {
-      setValidationError('Please include an @ symbol in your email');
+      setValidationError('Please enter text before and after the @ symbol');
       return;
     }
 
@@ -291,7 +301,7 @@ const Auth = () => {
                     <Input 
                       id="signup-email" 
                       type="email" 
-                      placeholder="your.name@example.com"
+                      placeholder="any@example.com"
                       value={email}
                       onChange={(e) => {
                         setEmail(e.target.value);
@@ -300,7 +310,7 @@ const Auth = () => {
                       required
                     />
                     <p className="text-xs text-muted-foreground">
-                      Use any email format with an @ symbol
+                      Just enter any text with an @ symbol in the middle
                     </p>
                   </div>
                   
