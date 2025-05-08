@@ -2,9 +2,17 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Bell, ArrowRight, Activity, FileText, Database, VolumeX, Volume2 } from 'lucide-react';
+import { Bell, ArrowRight, Activity, FileText, Database, VolumeX, Volume2, Key } from 'lucide-react';
 import { SystemStatus } from '@/types/equipment';
 import { speak, stopSpeaking, getVoices } from '@/utils/textToSpeech';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { toast } from 'sonner';
+import { 
+  getGeminiApiKey, 
+  setGeminiApiKey, 
+  hasGeminiApiKey, 
+  generateGeminiResponse 
+} from '@/utils/geminiAPI';
 
 // Simulated system status for the AI assistant
 const simulatedSystemStatus: SystemStatus = {
@@ -137,7 +145,7 @@ const generateAIResponse = (query: string, systemStatus: SystemStatus): string =
 const AIAssistant: React.FC = () => {
   const [inputValue, setInputValue] = useState('');
   const [messages, setMessages] = useState([
-    { role: 'system', content: 'Welcome to Vigía AI Assistant. How can I help you today?' },
+    { role: 'system' as const, content: 'Welcome to Vigía AI Assistant. How can I help you today?' },
   ]);
   const [isTyping, setIsTyping] = useState(false);
   const [systemStatus, setSystemStatus] = useState<SystemStatus>(simulatedSystemStatus);
@@ -150,6 +158,16 @@ const AIAssistant: React.FC = () => {
   const [isSpeechEnabled, setIsSpeechEnabled] = useState(false);
   const [voicesLoaded, setVoicesLoaded] = useState(false);
   const lastResponseRef = useRef<string>('');
+  const [showApiKeyDialog, setShowApiKeyDialog] = useState(false);
+  const [apiKeyInput, setApiKeyInput] = useState('');
+
+  // Check if API key is missing on component mount
+  useEffect(() => {
+    if (!hasGeminiApiKey()) {
+      // Show API key dialog if no key is found
+      setShowApiKeyDialog(true);
+    }
+  }, []);
 
   // Initialize speech synthesis voices when component mounts
   useEffect(() => {
@@ -205,7 +223,38 @@ const AIAssistant: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Generate AI response using Gemini API
+  const getAIResponse = async (query: string): Promise<string> => {
+    if (!hasGeminiApiKey()) {
+      setShowApiKeyDialog(true);
+      return "Please provide a Gemini API key to enable AI responses.";
+    }
+    
+    try {
+      // Context for Gemini API
+      const systemContext = `You are Vigía AI Assistant, an AI assistant for an offshore oil rig safety monitoring system.
+      You should respond to queries about equipment status, maintenance schedules, safety protocols, and operational procedures.
+      Current system status: ${JSON.stringify(systemStatus)}`;
+      
+      // Convert chat history to Gemini format
+      const geminiMessages = messages.slice(-5).map(msg => ({
+        role: msg.role === 'system' ? 'model' : 'user',
+        content: msg.content
+      }));
+      
+      // Add user's new query
+      geminiMessages.push({ role: 'user', content: query });
+      
+      // Call Gemini API
+      const response = await generateGeminiResponse(geminiMessages, systemContext);
+      return response;
+    } catch (error) {
+      console.error('Error generating AI response:', error);
+      return "I'm having trouble connecting to my knowledge base. Please check your API key or try again later.";
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!inputValue.trim()) return;
@@ -213,7 +262,7 @@ const AIAssistant: React.FC = () => {
     // Add user message
     const newMessages = [
       ...messages,
-      { role: 'user', content: inputValue }
+      { role: 'user' as const, content: inputValue }
     ];
     
     setMessages(newMessages);
@@ -225,17 +274,14 @@ const AIAssistant: React.FC = () => {
       stopSpeaking();
     }
     
-    // Simulate AI thinking and typing
-    setTimeout(() => {
-      const aiResponse = generateAIResponse(inputValue, systemStatus);
+    try {
+      // Get AI response from Gemini
+      const aiResponse = await getAIResponse(inputValue);
       
       setMessages([
         ...newMessages,
-        { role: 'system', content: aiResponse }
+        { role: 'system' as const, content: aiResponse }
       ]);
-      setIsTyping(false);
-      
-      // Speech is now handled by useEffect
       
       // Update suggested queries based on the conversation
       if (inputValue.toLowerCase().includes('maintenance')) {
@@ -253,7 +299,16 @@ const AIAssistant: React.FC = () => {
           'What is the current health score of the primary pump?'
         ]);
       }
-    }, 1000);
+    } catch (error) {
+      // Handle error
+      setMessages([
+        ...newMessages,
+        { role: 'system' as const, content: "I'm sorry, I encountered an error processing your request." }
+      ]);
+      console.error('Error in AI response:', error);
+    } finally {
+      setIsTyping(false);
+    }
   };
 
   const handleSuggestedQuery = (query: string) => {
@@ -275,85 +330,141 @@ const AIAssistant: React.FC = () => {
     setIsSpeechEnabled(!isSpeechEnabled);
   };
 
+  const saveApiKey = () => {
+    if (apiKeyInput.trim()) {
+      setGeminiApiKey(apiKeyInput.trim());
+      setShowApiKeyDialog(false);
+      toast.success('Gemini API key saved');
+      setApiKeyInput('');
+    } else {
+      toast.error('Please enter a valid API key');
+    }
+  };
+
   return (
-    <Card className="bg-vigia-card border-border h-full flex flex-col">
-      <div className="p-3 border-b border-border flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="h-2 w-2 rounded-full bg-vigia-teal animate-pulse"></div>
-          <h2 className="font-medium">Vigía AI Assistant</h2>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={toggleSpeech} 
-            title={isSpeechEnabled ? "Disable voice responses" : "Enable voice responses"}
-          >
-            {isSpeechEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
-          </Button>
-          <Button variant="ghost" size="icon">
-            <Bell className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-      
-      <div className="flex-1 overflow-y-auto p-3 space-y-3">
-        {messages.map((message, index) => (
-          <div 
-            key={index} 
-            className={`p-2 rounded-md max-w-[85%] ${
-              message.role === 'user' 
-                ? 'ml-auto bg-vigia-teal text-black' 
-                : 'bg-secondary'
-            } animate-fade-in`}
-          >
-            {message.content}
+    <>
+      <Card className="bg-vigia-card border-border h-full flex flex-col">
+        <div className="p-3 border-b border-border flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="h-2 w-2 rounded-full bg-vigia-teal animate-pulse"></div>
+            <h2 className="font-medium">Vigía AI Assistant</h2>
           </div>
-        ))}
-        {isTyping && (
-          <div className="p-2 rounded-md max-w-[85%] bg-secondary animate-pulse">
-            <div className="flex space-x-1">
-              <div className="h-2 w-2 bg-vigia-muted rounded-full"></div>
-              <div className="h-2 w-2 bg-vigia-muted rounded-full"></div>
-              <div className="h-2 w-2 bg-vigia-muted rounded-full"></div>
-            </div>
-          </div>
-        )}
-      </div>
-      
-      <div className="p-2 border-t border-border">
-        <div className="flex flex-wrap gap-1 mb-2">
-          {suggestedQueries.map((query, index) => (
-            <button
-              key={index}
-              onClick={() => handleSuggestedQuery(query)}
-              className="text-xs bg-secondary py-1 px-2 rounded-full hover:bg-secondary/80 flex items-center gap-1 transition-colors"
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => setShowApiKeyDialog(true)} 
+              title="Set Gemini API Key"
             >
-              {index === 0 && <Activity className="h-3 w-3" />}
-              {index === 1 && <FileText className="h-3 w-3" />}
-              {index === 2 && <Database className="h-3 w-3" />}
-              {index === 3 && <Bell className="h-3 w-3" />}
-              <span className="truncate max-w-[150px]">{query}</span>
-            </button>
-          ))}
+              <Key className="h-4 w-4" />
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={toggleSpeech} 
+              title={isSpeechEnabled ? "Disable voice responses" : "Enable voice responses"}
+            >
+              {isSpeechEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+            </Button>
+            <Button variant="ghost" size="icon">
+              <Bell className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
         
-        <form 
-          onSubmit={handleSubmit} 
-          className="flex items-center gap-2"
-        >
-          <Input 
-            placeholder="Ask about safety protocols, maintenance, or status..."
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            className="bg-muted border-muted"
-          />
-          <Button type="submit" size="sm" className="flex-shrink-0">
-            <ArrowRight className="h-4 w-4" />
-          </Button>
-        </form>
-      </div>
-    </Card>
+        <div className="flex-1 overflow-y-auto p-3 space-y-3">
+          {messages.map((message, index) => (
+            <div 
+              key={index} 
+              className={`p-2 rounded-md max-w-[85%] ${
+                message.role === 'user' 
+                  ? 'ml-auto bg-vigia-teal text-black' 
+                  : 'bg-secondary'
+              } animate-fade-in`}
+            >
+              {message.content}
+            </div>
+          ))}
+          {isTyping && (
+            <div className="p-2 rounded-md max-w-[85%] bg-secondary animate-pulse">
+              <div className="flex space-x-1">
+                <div className="h-2 w-2 bg-vigia-muted rounded-full"></div>
+                <div className="h-2 w-2 bg-vigia-muted rounded-full"></div>
+                <div className="h-2 w-2 bg-vigia-muted rounded-full"></div>
+              </div>
+            </div>
+          )}
+        </div>
+        
+        <div className="p-2 border-t border-border">
+          <div className="flex flex-wrap gap-1 mb-2">
+            {suggestedQueries.map((query, index) => (
+              <button
+                key={index}
+                onClick={() => handleSuggestedQuery(query)}
+                className="text-xs bg-secondary py-1 px-2 rounded-full hover:bg-secondary/80 flex items-center gap-1 transition-colors"
+              >
+                {index === 0 && <Activity className="h-3 w-3" />}
+                {index === 1 && <FileText className="h-3 w-3" />}
+                {index === 2 && <Database className="h-3 w-3" />}
+                {index === 3 && <Bell className="h-3 w-3" />}
+                <span className="truncate max-w-[150px]">{query}</span>
+              </button>
+            ))}
+          </div>
+          
+          <form 
+            onSubmit={handleSubmit} 
+            className="flex items-center gap-2"
+          >
+            <Input 
+              placeholder="Ask about safety protocols, maintenance, or status..."
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              className="bg-muted border-muted"
+            />
+            <Button type="submit" size="sm" className="flex-shrink-0">
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+          </form>
+        </div>
+      </Card>
+
+      {/* API Key Dialog */}
+      <Dialog open={showApiKeyDialog} onOpenChange={setShowApiKeyDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Gemini API Key Required</DialogTitle>
+            <DialogDescription>
+              Please enter your Gemini API key to enable AI responses. 
+              Your key will be stored locally in your browser.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4">
+            <Input
+              type="password"
+              placeholder="Enter Gemini API Key"
+              value={apiKeyInput}
+              onChange={(e) => setApiKeyInput(e.target.value)}
+              className="w-full"
+            />
+            <p className="mt-2 text-xs text-muted-foreground">
+              You can get a Gemini API key from the Google AI Studio website. The key will be stored in your browser's local storage.
+            </p>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowApiKeyDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={saveApiKey}>
+              Save API Key
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 
