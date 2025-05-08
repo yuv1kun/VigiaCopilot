@@ -30,18 +30,18 @@ const generateRandomDate = (minDays: number, maxDays: number): string => {
 // Generate initial maintenance items
 const generateInitialMaintenanceItems = (): MaintenanceItem[] => {
   const maintenanceTasks = [
-    { title: 'BOP Pressure System Inspection', priority: 'high', estimatedTime: 3, equipmentId: 'bop-001' },
-    { title: 'Hydraulic Line Replacement', priority: 'medium', estimatedTime: 5, equipmentId: 'hyd-002' },
-    { title: 'Seal Integrity Check', priority: 'medium', estimatedTime: 2, equipmentId: 'seal-003' },
-    { title: 'Wellhead Temperature Calibration', priority: 'high', estimatedTime: 4, equipmentId: 'well-004' },
-    { title: 'Gas Detection System Check', priority: 'high', estimatedTime: 3, equipmentId: 'gas-005' },
-    { title: 'Pipe Corrosion Inspection', priority: 'medium', estimatedTime: 6, equipmentId: 'pipe-006' },
-    { title: 'Emergency Shutdown Test', priority: 'high', estimatedTime: 2, equipmentId: 'esd-007' },
-    { title: 'Drilling Equipment Lubrication', priority: 'low', estimatedTime: 4, equipmentId: 'drill-008' },
-    { title: 'Control System Firmware Update', priority: 'medium', estimatedTime: 8, equipmentId: 'ctrl-009' },
-    { title: 'Power Generator Maintenance', priority: 'high', estimatedTime: 6, equipmentId: 'power-010' },
-    { title: 'Mud Pump Inspection', priority: 'medium', estimatedTime: 3, equipmentId: 'mud-011' },
-    { title: 'Derrick Structural Inspection', priority: 'high', estimatedTime: 5, equipmentId: 'drk-012' },
+    { title: 'BOP Pressure System Inspection', priority: 'high' as const, estimatedTime: 3, equipmentId: 'bop-001' },
+    { title: 'Hydraulic Line Replacement', priority: 'medium' as const, estimatedTime: 5, equipmentId: 'hyd-002' },
+    { title: 'Seal Integrity Check', priority: 'medium' as const, estimatedTime: 2, equipmentId: 'seal-003' },
+    { title: 'Wellhead Temperature Calibration', priority: 'high' as const, estimatedTime: 4, equipmentId: 'well-004' },
+    { title: 'Gas Detection System Check', priority: 'high' as const, estimatedTime: 3, equipmentId: 'gas-005' },
+    { title: 'Pipe Corrosion Inspection', priority: 'medium' as const, estimatedTime: 6, equipmentId: 'pipe-006' },
+    { title: 'Emergency Shutdown Test', priority: 'high' as const, estimatedTime: 2, equipmentId: 'esd-007' },
+    { title: 'Drilling Equipment Lubrication', priority: 'low' as const, estimatedTime: 4, equipmentId: 'drill-008' },
+    { title: 'Control System Firmware Update', priority: 'medium' as const, estimatedTime: 8, equipmentId: 'ctrl-009' },
+    { title: 'Power Generator Maintenance', priority: 'high' as const, estimatedTime: 6, equipmentId: 'power-010' },
+    { title: 'Mud Pump Inspection', priority: 'medium' as const, estimatedTime: 3, equipmentId: 'mud-011' },
+    { title: 'Derrick Structural Inspection', priority: 'high' as const, estimatedTime: 5, equipmentId: 'drk-012' },
   ];
 
   // Create completed items (in the past)
@@ -163,11 +163,11 @@ export const useMaintenanceSchedule = (updateInterval = 10000) => {
               case 'new': {
                 // Add a new maintenance task
                 const maintenanceTasks = [
-                  { title: 'Pressure Relief Valve Inspection', priority: 'high', estimatedTime: 2, equipmentId: 'valve-013' },
-                  { title: 'Electrical System Check', priority: 'medium', estimatedTime: 4, equipmentId: 'elec-014' },
-                  { title: 'Cooling System Maintenance', priority: 'low', estimatedTime: 3, equipmentId: 'cool-015' },
-                  { title: 'Safety Sensor Calibration', priority: 'high', estimatedTime: 2, equipmentId: 'sens-016' },
-                  { title: 'Winch Cable Inspection', priority: 'medium', estimatedTime: 4, equipmentId: 'winch-017' },
+                  { title: 'Pressure Relief Valve Inspection', priority: 'high' as const, estimatedTime: 2, equipmentId: 'valve-013' },
+                  { title: 'Electrical System Check', priority: 'medium' as const, estimatedTime: 4, equipmentId: 'elec-014' },
+                  { title: 'Cooling System Maintenance', priority: 'low' as const, estimatedTime: 3, equipmentId: 'cool-015' },
+                  { title: 'Safety Sensor Calibration', priority: 'high' as const, estimatedTime: 2, equipmentId: 'sens-016' },
+                  { title: 'Winch Cable Inspection', priority: 'medium' as const, estimatedTime: 4, equipmentId: 'winch-017' },
                 ];
                 
                 const newTask = maintenanceTasks[Math.floor(Math.random() * maintenanceTasks.length)];
@@ -205,9 +205,9 @@ export const useMaintenanceSchedule = (updateInterval = 10000) => {
               case 'emergency': {
                 // Add an emergency maintenance task (high priority, immediate)
                 const emergencyTasks = [
-                  { title: 'Critical Valve Failure Repair', priority: 'high', estimatedTime: 4, equipmentId: 'valve-emg-1' },
-                  { title: 'Emergency Pressure System Fix', priority: 'high', estimatedTime: 3, equipmentId: 'pres-emg-2' },
-                  { title: 'Power System Failure Recovery', priority: 'high', estimatedTime: 6, equipmentId: 'power-emg-3' },
+                  { title: 'Critical Valve Failure Repair', priority: 'high' as const, estimatedTime: 4, equipmentId: 'valve-emg-1' },
+                  { title: 'Emergency Pressure System Fix', priority: 'high' as const, estimatedTime: 3, equipmentId: 'pres-emg-2' },
+                  { title: 'Power System Failure Recovery', priority: 'high' as const, estimatedTime: 6, equipmentId: 'power-emg-3' },
                 ];
                 
                 const emergencyTask = emergencyTasks[Math.floor(Math.random() * emergencyTasks.length)];
@@ -306,3 +306,4 @@ export const useMaintenanceSchedule = (updateInterval = 10000) => {
     clearLastEvent
   };
 };
+
