@@ -1,9 +1,10 @@
 
 import React from 'react';
 import StatusCard from './StatusCard';
-import { Gauge, Thermometer, AlertTriangle, Eye, Power, PowerOff, Shield, Info, Wrench } from 'lucide-react';
+import { Gauge, Thermometer, AlertTriangle, Eye, Power, PowerOff, Shield, Info, Wrench, HardHat, Glasses, Shirt, Hand } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { useRealTimeMonitoring } from '@/hooks/useRealTimeMonitoring';
+import { usePPECompliance } from '@/hooks/usePPECompliance';
 
 const MonitoringPanel: React.FC = () => {
   const { 
@@ -16,6 +17,8 @@ const MonitoringPanel: React.FC = () => {
     isSimulating,
     toggleSimulation
   } = useRealTimeMonitoring(1000); // Update every second
+  
+  const { ppeComplianceData, isActive } = usePPECompliance(isSimulating, 2000); // Update every 2 seconds
   
   return (
     <div className="space-y-6">
@@ -98,49 +101,73 @@ const MonitoringPanel: React.FC = () => {
               <Eye className="h-4 w-4 text-vigia-teal" />
               <h3 className="font-medium">PPE Detection Status</h3>
             </div>
-            <span className="text-xs bg-vigia-success/20 text-vigia-success py-1 px-2 rounded-full">
-              Live
+            <span className={`text-xs py-1 px-2 rounded-full ${isSimulating ? 'bg-vigia-success/20 text-vigia-success' : 'bg-vigia-muted/30 text-muted-foreground'}`}>
+              {isSimulating ? 'Live' : 'Paused'}
             </span>
           </div>
           
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm">Hard Hat Compliance</span>
+              <div className="flex items-center gap-2">
+                <HardHat className="h-4 w-4" />
+                <span className="text-sm">Hard Hat Compliance</span>
+              </div>
               <div className="flex items-center">
                 <div className="w-24 h-2 bg-vigia-muted/30 rounded-full overflow-hidden mr-2">
-                  <div className="h-full bg-vigia-success rounded-full" style={{ width: '96%' }}></div>
+                  <div 
+                    className={`h-full ${getComplianceColor(ppeComplianceData.hardHat)} rounded-full transition-all duration-500 ease-in-out`} 
+                    style={{ width: `${ppeComplianceData.hardHat}%` }}
+                  ></div>
                 </div>
-                <span className="text-sm">96%</span>
+                <span className="text-sm">{ppeComplianceData.hardHat}%</span>
               </div>
             </div>
             
             <div className="flex items-center justify-between">
-              <span className="text-sm">Safety Glasses</span>
+              <div className="flex items-center gap-2">
+                <Glasses className="h-4 w-4" />
+                <span className="text-sm">Safety Glasses</span>
+              </div>
               <div className="flex items-center">
                 <div className="w-24 h-2 bg-vigia-muted/30 rounded-full overflow-hidden mr-2">
-                  <div className="h-full bg-vigia-teal rounded-full" style={{ width: '100%' }}></div>
+                  <div 
+                    className={`h-full ${getComplianceColor(ppeComplianceData.safetyGlasses)} rounded-full transition-all duration-500 ease-in-out`} 
+                    style={{ width: `${ppeComplianceData.safetyGlasses}%` }}
+                  ></div>
                 </div>
-                <span className="text-sm">100%</span>
+                <span className="text-sm">{ppeComplianceData.safetyGlasses}%</span>
               </div>
             </div>
             
             <div className="flex items-center justify-between">
-              <span className="text-sm">Safety Vests</span>
+              <div className="flex items-center gap-2">
+                <Shirt className="h-4 w-4" />
+                <span className="text-sm">Safety Vests</span>
+              </div>
               <div className="flex items-center">
                 <div className="w-24 h-2 bg-vigia-muted/30 rounded-full overflow-hidden mr-2">
-                  <div className="h-full bg-vigia-warning rounded-full" style={{ width: '82%' }}></div>
+                  <div 
+                    className={`h-full ${getComplianceColor(ppeComplianceData.safetyVests)} rounded-full transition-all duration-500 ease-in-out`} 
+                    style={{ width: `${ppeComplianceData.safetyVests}%` }}
+                  ></div>
                 </div>
-                <span className="text-sm">82%</span>
+                <span className="text-sm">{ppeComplianceData.safetyVests}%</span>
               </div>
             </div>
             
             <div className="flex items-center justify-between">
-              <span className="text-sm">Protective Gloves</span>
+              <div className="flex items-center gap-2">
+                <Hand className="h-4 w-4" />
+                <span className="text-sm">Protective Gloves</span>
+              </div>
               <div className="flex items-center">
                 <div className="w-24 h-2 bg-vigia-muted/30 rounded-full overflow-hidden mr-2">
-                  <div className="h-full bg-vigia-warning rounded-full" style={{ width: '78%' }}></div>
+                  <div 
+                    className={`h-full ${getComplianceColor(ppeComplianceData.protectiveGloves)} rounded-full transition-all duration-500 ease-in-out`} 
+                    style={{ width: `${ppeComplianceData.protectiveGloves}%` }}
+                  ></div>
                 </div>
-                <span className="text-sm">78%</span>
+                <span className="text-sm">{ppeComplianceData.protectiveGloves}%</span>
               </div>
             </div>
           </div>
@@ -148,6 +175,14 @@ const MonitoringPanel: React.FC = () => {
       </div>
     </div>
   );
+};
+
+// Helper function to get color based on compliance percentage
+const getComplianceColor = (value: number): string => {
+  if (value >= 95) return 'bg-vigia-teal';
+  if (value >= 85) return 'bg-vigia-success';
+  if (value >= 75) return 'bg-vigia-warning';
+  return 'bg-vigia-danger';
 };
 
 export default MonitoringPanel;
