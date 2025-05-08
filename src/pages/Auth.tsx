@@ -10,7 +10,6 @@ import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 
 const Auth = () => {
   const [email, setEmail] = useState('');
@@ -57,6 +56,8 @@ const Auth = () => {
       if (authError) throw authError;
       
       if (authData.user) {
+        console.log("Auth user created:", authData.user.id);
+        
         // Then insert the user profile data
         const { error: profileError } = await supabase
           .from('users')
@@ -69,9 +70,17 @@ const Auth = () => {
             last_login: new Date().toISOString()
           });
 
-        if (profileError) throw profileError;
+        if (profileError) {
+          console.error("Profile error:", profileError);
+          throw profileError;
+        }
         
         toast.success('Account created! Check your email for the confirmation link.');
+        
+        // Optionally log in the user immediately if auto-confirm is enabled
+        // Uncomment if you want this behavior
+        // await supabase.auth.signInWithPassword({ email, password });
+        // navigate('/');
       }
     } catch (error: any) {
       console.error('Sign up error:', error); 

@@ -1,4 +1,3 @@
-
 -- Enable UUID extension if not already enabled
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
@@ -193,9 +192,21 @@ CREATE TABLE IF NOT EXISTS companion_interactions (
 
 -- Users RLS
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can view all users" ON users;
+DROP POLICY IF EXISTS "Only admins can insert users" ON users;
+DROP POLICY IF EXISTS "Users can update their own profile" ON users;
+
+-- Allow all authenticated users to view all users
 CREATE POLICY "Users can view all users" ON users FOR SELECT USING (true);
-CREATE POLICY "Only admins can insert users" ON users FOR INSERT WITH CHECK (auth.jwt() ->> 'role' = 'admin');
-CREATE POLICY "Users can update their own profile" ON users FOR UPDATE USING (auth.uid() = id) WITH CHECK (auth.uid() = id OR auth.jwt() ->> 'role' = 'admin');
+
+-- Allow authenticated users to insert their own profile (fixed signup issue)
+CREATE POLICY "Users can insert their own profile" ON users 
+  FOR INSERT WITH CHECK (auth.uid() = id);
+
+-- Allow users to update their own profile or admins to update any profile
+CREATE POLICY "Users can update their own profile" ON users 
+  FOR UPDATE USING (auth.uid() = id OR auth.jwt() ->> 'role' = 'admin') 
+  WITH CHECK (auth.uid() = id OR auth.jwt() ->> 'role' = 'admin');
 
 -- Equipment RLS
 ALTER TABLE equipment ENABLE ROW LEVEL SECURITY;
