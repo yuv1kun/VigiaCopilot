@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { 
@@ -12,6 +11,7 @@ import {
   calculateTrend,
   formatValue,
   SAFETY_PARAMETERS,
+  SAFETY_THRESHOLDS,
   generateAlert
 } from '@/utils/monitoringUtils';
 
@@ -328,8 +328,8 @@ export const useRealTimeMonitoring = (updateInterval: number = 1000) => {
         if (bopStatus !== prevState.bopPressure.status) {
           if (bopStatus === 'warning' || bopStatus === 'alert') {
             const threshold = bopStatus === 'warning' ? 
-              SAFETY_PARAMETERS.bopPressure.baseline + 200 : 
-              SAFETY_PARAMETERS.bopPressure.baseline + 400;
+              SAFETY_THRESHOLDS.bopPressure.warning : // Fixed: Use SAFETY_THRESHOLDS instead of SAFETY_PARAMETERS
+              SAFETY_THRESHOLDS.bopPressure.alert;   // Fixed: Use SAFETY_THRESHOLDS instead of SAFETY_PARAMETERS
               
             const alert = generateAlert('bopPressure', newBOPPressure, threshold);
             toast[bopStatus === 'alert' ? 'error' : 'warning'](alert.message, {
@@ -342,8 +342,8 @@ export const useRealTimeMonitoring = (updateInterval: number = 1000) => {
         if (tempStatus !== prevState.wellheadTemperature.status) {
           if (tempStatus === 'warning' || tempStatus === 'alert') {
             const threshold = tempStatus === 'warning' ? 
-              SAFETY_PARAMETERS.wellheadTemperature.warning : 
-              SAFETY_PARAMETERS.wellheadTemperature.alert;
+              SAFETY_THRESHOLDS.wellheadTemperature.warning : // Fixed: Use SAFETY_THRESHOLDS instead of SAFETY_PARAMETERS
+              SAFETY_THRESHOLDS.wellheadTemperature.alert;   // Fixed: Use SAFETY_THRESHOLDS instead of SAFETY_PARAMETERS
               
             const alert = generateAlert('wellheadTemperature', newWellheadTemp, threshold);
             toast[tempStatus === 'alert' ? 'error' : 'warning'](alert.message, {
@@ -356,8 +356,8 @@ export const useRealTimeMonitoring = (updateInterval: number = 1000) => {
         if (gasStatus !== prevState.gasDetection.status) {
           if (gasStatus === 'warning' || gasStatus === 'alert') {
             const threshold = gasStatus === 'warning' ? 
-              SAFETY_PARAMETERS.gasDetection.warning : 
-              SAFETY_PARAMETERS.gasDetection.alert;
+              SAFETY_THRESHOLDS.gasDetection.warning : // Use SAFETY_THRESHOLDS
+              SAFETY_THRESHOLDS.gasDetection.alert;   // Use SAFETY_THRESHOLDS
               
             const alert = generateAlert('gasDetection', newGasDetection, threshold);
             toast[gasStatus === 'alert' ? 'error' : 'warning'](alert.message, {
