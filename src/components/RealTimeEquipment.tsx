@@ -339,7 +339,7 @@ const EquipmentCard: React.FC<{ equipment: EquipmentData }> = ({ equipment }) =>
                   equipment.healthScore > 70 ? 'text-vigia-teal' : 
                   'text-vigia-warning'
                 }>
-                  {equipment.healthScore}%
+                  {equipment.healthScore.toFixed(2)}%
                 </span>
               </div>
             </div>
@@ -445,7 +445,7 @@ const EquipmentCard: React.FC<{ equipment: EquipmentData }> = ({ equipment }) =>
                         style={{ width: `${component.healthScore}%` }}
                       />
                     </div>
-                    <span className="text-muted-foreground whitespace-nowrap">{component.healthScore}%</span>
+                    <span className="text-muted-foreground whitespace-nowrap">{component.healthScore.toFixed(2)}%</span>
                   </div>
                 </div>
               ))}
