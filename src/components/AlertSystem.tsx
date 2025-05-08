@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -203,8 +202,10 @@ const AlertSystem: React.FC = () => {
   };
 
   const getTimeString = (date: Date): string => {
+    // Ensure we're working with a proper Date object
+    const dateObj = date instanceof Date ? date : new Date(date);
     const now = new Date();
-    const diffMinutes = Math.floor((now.getTime() - date.getTime()) / 60000);
+    const diffMinutes = Math.floor((now.getTime() - dateObj.getTime()) / 60000);
     
     if (diffMinutes < 1) return 'just now';
     if (diffMinutes < 60) return `${diffMinutes} min ago`;

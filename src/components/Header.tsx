@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Bell, Eye, Gauge, Shield, Wrench } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -24,7 +23,13 @@ const Header: React.FC = () => {
   useEffect(() => {
     const storedAlerts = localStorage.getItem('vigia-alerts');
     if (storedAlerts) {
-      const parsedAlerts = JSON.parse(storedAlerts);
+      const parsedData = JSON.parse(storedAlerts);
+      // Ensure timestamps are Date objects
+      const parsedAlerts = parsedData.map((alert: any) => ({
+        ...alert,
+        timestamp: new Date(alert.timestamp)
+      }));
+      
       setActiveAlerts(parsedAlerts.filter((alert: Alert) => !alert.isAcknowledged));
       setUnreadCount(parsedAlerts.filter((alert: Alert) => !alert.isAcknowledged).length);
     }
@@ -35,7 +40,13 @@ const Header: React.FC = () => {
     const handleStorageChange = () => {
       const storedAlerts = localStorage.getItem('vigia-alerts');
       if (storedAlerts) {
-        const parsedAlerts = JSON.parse(storedAlerts);
+        const parsedData = JSON.parse(storedAlerts);
+        // Ensure timestamps are Date objects
+        const parsedAlerts = parsedData.map((alert: any) => ({
+          ...alert,
+          timestamp: new Date(alert.timestamp)
+        }));
+        
         setActiveAlerts(parsedAlerts.filter((alert: Alert) => !alert.isAcknowledged));
         setUnreadCount(parsedAlerts.filter((alert: Alert) => !alert.isAcknowledged).length);
       }
@@ -137,8 +148,10 @@ const Header: React.FC = () => {
   };
 
   const formatTimeAgo = (date: Date) => {
+    // Ensure we're working with a proper Date object
+    const dateObj = date instanceof Date ? date : new Date(date);
     const now = new Date();
-    const diffMs = now.getTime() - new Date(date).getTime();
+    const diffMs = now.getTime() - dateObj.getTime();
     const diffMins = Math.floor(diffMs / (1000 * 60));
     
     if (diffMins < 1) return 'just now';

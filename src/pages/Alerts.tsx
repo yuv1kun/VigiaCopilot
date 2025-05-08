@@ -29,8 +29,14 @@ const Alerts: React.FC = () => {
     const storedAlerts = localStorage.getItem('vigia-alerts');
     if (storedAlerts) {
       const allAlerts = JSON.parse(storedAlerts);
-      setActiveAlerts(allAlerts.filter((alert: Alert) => !alert.isAcknowledged));
-      setResolvedAlerts(allAlerts.filter((alert: Alert) => alert.isAcknowledged).slice(0, 5));
+      // Convert string timestamps back to Date objects
+      const parsedAlerts = allAlerts.map((alert: any) => ({
+        ...alert,
+        timestamp: new Date(alert.timestamp)
+      }));
+      
+      setActiveAlerts(parsedAlerts.filter((alert: Alert) => !alert.isAcknowledged));
+      setResolvedAlerts(parsedAlerts.filter((alert: Alert) => alert.isAcknowledged).slice(0, 5));
     } else {
       // Initialize with some sample alerts if none exist
       const initialAlerts = [
@@ -448,8 +454,9 @@ const AlertItem: React.FC<AlertItemProps> = ({ alert, onDismiss, isResolved = fa
   };
 
   const getTimeString = (date: Date): string => {
+    const dateObj = date instanceof Date ? date : new Date(date);
     const now = new Date();
-    const diffMinutes = Math.floor((now.getTime() - date.getTime()) / 60000);
+    const diffMinutes = Math.floor((now.getTime() - dateObj.getTime()) / 60000);
     
     if (diffMinutes < 1) return 'just now';
     if (diffMinutes < 60) return `${diffMinutes} min ago`;
