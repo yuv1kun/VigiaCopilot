@@ -67,11 +67,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       // Check auth settings if possible
       try {
-        const { data, error } = await supabase.from('auth.config').select('*');
+        const { data, error } = await supabase.rpc('check_auth_config');
         if (data) console.log('Auth config:', data);
-        if (error) console.log('Cannot query auth config:', error);
+        if (error) console.log('Cannot query auth config RPC:', error);
       } catch (e) {
         console.log('Auth config check failed, expected for regular users');
+      }
+      
+      // Try signing up with test email
+      try {
+        const testEmail = "test+" + Math.random().toString(36).substring(2, 10) + "@example.com";
+        const testPassword = "password123";
+        
+        console.log("Testing signup with:", testEmail);
+        const { data: signupData, error: signupError } = await supabase.auth.signUp({
+          email: testEmail,
+          password: testPassword,
+          options: {
+            data: {
+              name: "Test User",
+              role: "operator",
+              is_test: true
+            }
+          }
+        });
+        
+        console.log("Test signup result:", signupError ? "Error: " + signupError.message : "Success", signupData);
+      } catch (e) {
+        console.error("Test signup failed:", e);
       }
       
       toast.info('Auth debug info logged to console');

@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
@@ -7,8 +6,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { supabase } from '@/lib/supabase';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { supabase, checkAuthConfig } from '@/lib/supabase';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const Auth = () => {
@@ -22,16 +21,26 @@ const Auth = () => {
   const [loading, setLoading] = useState(false);
   const [signupStep, setSignupStep] = useState(1);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState<string | null>(null);
   const navigate = useNavigate();
+  
+  // Quick bypass - try different formats for the user
+  const prepareEmail = (input: string) => {
+    // Make email as permissive as possible - just ensure it has an @ symbol
+    if (!input.includes('@')) {
+      return input + '@example.com'; // Add a domain if missing
+    }
+    return input;
+  };
 
-  // NO validation - we want to test if Supabase will accept any email
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setValidationError(null);
     setLoading(true);
+    setDebugInfo(null);
 
     try {
-      // Minimal validation - just ensure fields aren't empty
+      // Minimal validation - just ensure fields aren't totally empty
       if (!email || !password) {
         setValidationError('Email and password are required');
         setLoading(false);
@@ -44,33 +53,37 @@ const Auth = () => {
         return;
       }
 
-      console.log("Attempting to sign up with email:", email);
+      const processedEmail = prepareEmail(email);
+      console.log("Attempting to sign up with processed email:", processedEmail, "(original:", email + ")");
       
-      // First create the authentication account with debug options
+      // Use any value as email that contains @ and a domain
       const { data: authData, error: authError } = await supabase.auth.signUp({
-        email,
+        email: processedEmail,
         password,
         options: {
           data: {
             name,
             role,
-            phone
+            phone,
+            original_email: email // Store the original email too
           },
           emailRedirectTo: window.location.origin
         }
       });
 
       if (authError) {
-        console.error("Auth error:", authError);
-        console.log("Full error object:", JSON.stringify(authError));
+        console.error("Auth error details:", authError);
         
-        // Special case for email validation errors - show exactly what happened
-        if (authError.message.includes('email')) {
-          setValidationError(`Email error: ${authError.message}`);
-          toast.error(`Email error: ${authError.message}. Try using a test+123@example.com format.`);
-        } else {
-          setValidationError(authError.message);
-        }
+        // Collect debug info
+        const debugDetails = `
+          Error type: ${authError.name}
+          Error message: ${authError.message}
+          Error details: ${JSON.stringify(authError, null, 2)}
+        `;
+        setDebugInfo(debugDetails);
+        
+        setValidationError(`Authentication error: ${authError.message}`);
+        toast.error("Sign-up failed: " + authError.message);
         setLoading(false);
         return;
       }
@@ -85,7 +98,7 @@ const Auth = () => {
             id: authData.user.id,
             name,
             role,
-            contact_info: { email, phone },
+            contact_info: { email: processedEmail, phone, original_email: email },
             assigned_zones: assignedZones,
             last_login: new Date().toISOString()
           });
@@ -102,7 +115,7 @@ const Auth = () => {
         
         // Automatically sign in the user after successful signup
         const { error: signInError } = await supabase.auth.signInWithPassword({ 
-          email, 
+          email: processedEmail, 
           password 
         });
         
@@ -204,19 +217,18 @@ const Auth = () => {
     setAssignedZones(assignedZones.filter(z => z !== zone));
   };
 
-  // Update the Supabase client to explicitly disable any email validation
-  React.useEffect(() => {
-    const updateAuthParams = async () => {
+  // Check auth config when component loads
+  useEffect(() => {
+    const testAuthConfig = async () => {
       try {
-        await supabase.functions.invoke('disable-email-validation', {
-          method: 'POST',
-        });
+        const result = await checkAuthConfig();
+        console.log("Auth config test result:", result);
       } catch (err) {
-        console.log('Unable to disable email validation via function, continuing anyway');
+        console.error("Error testing auth config:", err);
       }
     };
     
-    updateAuthParams();
+    testAuthConfig();
   }, []);
 
   return (
@@ -296,7 +308,7 @@ const Auth = () => {
                     <Input 
                       id="signup-email" 
                       type="text" 
-                      placeholder="Try test+123@example.com"
+                      placeholder="Enter any value with @ symbol"
                       value={email}
                       onChange={(e) => {
                         setEmail(e.target.value);
@@ -305,7 +317,7 @@ const Auth = () => {
                       required
                     />
                     <p className="text-xs text-muted-foreground">
-                      Try using test+123@example.com format if other emails don't work
+                      Don't worry about email format - we'll fix it if needed
                     </p>
                   </div>
                   
@@ -344,6 +356,16 @@ const Auth = () => {
                       <AlertDescription>{validationError}</AlertDescription>
                     </Alert>
                   )}
+                  
+                  {debugInfo && (
+                    <Alert variant="default" className="bg-amber-50 text-amber-900 border-amber-200">
+                      <AlertTitle>Debug Information</AlertTitle>
+                      <AlertDescription>
+                        <pre className="text-xs whitespace-pre-wrap">{debugInfo}</pre>
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                  
                   <Alert>
                     <AlertDescription>
                       Complete your profile information
