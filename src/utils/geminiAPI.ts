@@ -36,8 +36,12 @@ export const hasGeminiApiKey = (): boolean => {
   return !!apiKey;
 };
 
-interface GeminiMessage {
-  role: 'user' | 'model' | 'system';
+// Define the message role type to match what's used in AIAssistant
+export type MessageRole = 'user' | 'model' | 'system';
+
+// Define the message interface
+export interface GeminiMessage {
+  role: MessageRole;
   content: string;
 }
 

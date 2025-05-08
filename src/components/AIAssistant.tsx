@@ -11,7 +11,9 @@ import {
   getGeminiApiKey, 
   setGeminiApiKey, 
   hasGeminiApiKey, 
-  generateGeminiResponse 
+  generateGeminiResponse,
+  MessageRole,
+  GeminiMessage 
 } from '@/utils/geminiAPI';
 
 // Simulated system status for the AI assistant
@@ -76,6 +78,12 @@ const simulatedSystemStatus: SystemStatus = {
     }
   ]
 };
+
+// Define message type for local state management
+interface Message {
+  role: MessageRole;
+  content: string;
+}
 
 // Generate context-aware AI responses
 const generateAIResponse = (query: string, systemStatus: SystemStatus): string => {
@@ -144,8 +152,8 @@ const generateAIResponse = (query: string, systemStatus: SystemStatus): string =
 
 const AIAssistant: React.FC = () => {
   const [inputValue, setInputValue] = useState('');
-  const [messages, setMessages] = useState([
-    { role: 'system' as const, content: 'Welcome to Vigía AI Assistant. How can I help you today?' },
+  const [messages, setMessages] = useState<Message[]>([
+    { role: 'system', content: 'Welcome to Vigía AI Assistant. How can I help you today?' },
   ]);
   const [isTyping, setIsTyping] = useState(false);
   const [systemStatus, setSystemStatus] = useState<SystemStatus>(simulatedSystemStatus);
@@ -237,8 +245,8 @@ const AIAssistant: React.FC = () => {
       Current system status: ${JSON.stringify(systemStatus)}`;
       
       // Convert chat history to Gemini format
-      const geminiMessages = messages.slice(-5).map(msg => ({
-        role: msg.role === 'system' ? 'model' : 'user',
+      const geminiMessages: GeminiMessage[] = messages.slice(-5).map(msg => ({
+        role: msg.role,
         content: msg.content
       }));
       
@@ -260,9 +268,9 @@ const AIAssistant: React.FC = () => {
     if (!inputValue.trim()) return;
     
     // Add user message
-    const newMessages = [
+    const newMessages: Message[] = [
       ...messages,
-      { role: 'user' as const, content: inputValue }
+      { role: 'user', content: inputValue }
     ];
     
     setMessages(newMessages);
@@ -280,7 +288,7 @@ const AIAssistant: React.FC = () => {
       
       setMessages([
         ...newMessages,
-        { role: 'system' as const, content: aiResponse }
+        { role: 'system', content: aiResponse }
       ]);
       
       // Update suggested queries based on the conversation
@@ -303,7 +311,7 @@ const AIAssistant: React.FC = () => {
       // Handle error
       setMessages([
         ...newMessages,
-        { role: 'system' as const, content: "I'm sorry, I encountered an error processing your request." }
+        { role: 'system', content: "I'm sorry, I encountered an error processing your request." }
       ]);
       console.error('Error in AI response:', error);
     } finally {
@@ -321,7 +329,7 @@ const AIAssistant: React.FC = () => {
     } else {
       // If enabling speech, speak the last message
       const lastMessage = messages[messages.length - 1];
-      if (lastMessage?.role === 'system') {
+      if (lastMessage && lastMessage.role === 'system') {
         speak(lastMessage.content).catch(err => {
           console.error('Error speaking last message:', err);
         });
