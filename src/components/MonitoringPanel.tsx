@@ -67,21 +67,21 @@ const MonitoringPanel: React.FC = () => {
             value="96%"
             status="normal"
             icon={<Shield className="h-4 w-4" />}
-            trend={{ value: 1, direction: 'down' }}
+            trend={{ value: "1", direction: 'down' }}
           />
           <StatusCard
             title="Pipe Corrosion Est."
             value="0.23 mm/yr"
             status="warning"
             icon={<Info className="h-4 w-4" />}
-            trend={{ value: 5, direction: 'up' }}
+            trend={{ value: "5", direction: 'up' }}
           />
           <StatusCard
             title="Next Maintenance"
             value="7 days"
             status="normal"
             icon={<Wrench className="h-4 w-4" />}
-            trend={{ value: 0, direction: 'flat' }}
+            trend={{ value: "0", direction: 'flat' }}
           />
         </div>
       </div>

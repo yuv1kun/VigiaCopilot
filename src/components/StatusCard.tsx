@@ -8,7 +8,7 @@ interface StatusCardProps {
   status: 'normal' | 'warning' | 'alert' | 'inactive';
   icon: React.ReactNode;
   trend?: {
-    value: number;
+    value: number | string;
     direction: 'up' | 'down' | 'flat';
   };
   className?: string;

@@ -134,7 +134,7 @@ export const calculateTrend = (current: number, previous: number) => {
   }
   
   return {
-    value: Math.min(Math.abs(percentChange), 99).toFixed(1),
+    value: Math.abs(percentChange) < 99 ? Math.abs(percentChange).toFixed(1) : 99,
     direction
   };
 };
