@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Bell, Eye, Gauge, Shield, Wrench } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -52,10 +53,10 @@ const Header: React.FC = () => {
       }
     };
 
-    // Check for new alerts every 10 seconds
+    // Check for new alerts more frequently (every 5 seconds)
     const interval = setInterval(() => {
       handleStorageChange();
-    }, 10000);
+    }, 5000);
 
     // Listen for storage events (if another tab updates alerts)
     window.addEventListener('storage', handleStorageChange);
@@ -66,31 +67,105 @@ const Header: React.FC = () => {
     };
   }, []);
 
-  // Mock new alert arrival for demo purposes
+  // Simulate real-world oil rig alert patterns
   useEffect(() => {
     if (location.search.includes('forceHideBadge=true')) {
       setUnreadCount(0);
       return;
     }
     
+    // Time-based alert patterns - more likely during morning shift change and evening operations
+    const simulateOperationalPatterns = () => {
+      const hour = new Date().getHours();
+      
+      // Higher risk periods: Early morning (5-8AM), shift changes (2-3PM), night operations (11PM-1AM)
+      let alertProbability = 0.05; // Base probability
+      
+      if ((hour >= 5 && hour <= 8) || (hour >= 14 && hour <= 15) || (hour >= 23 || hour <= 1)) {
+        alertProbability = 0.12; // Higher probability during critical periods
+      }
+      
+      // Current weather or operational condition simulation
+      const conditions = ["normal", "stormy", "maintenance", "high-production"];
+      const currentCondition = conditions[Math.floor(Math.random() * conditions.length)];
+      
+      if (currentCondition === "stormy") {
+        alertProbability *= 1.5; // 50% more alerts during stormy conditions
+      } else if (currentCondition === "maintenance") {
+        alertProbability *= 1.3; // 30% more alerts during maintenance
+      } else if (currentCondition === "high-production") {
+        alertProbability *= 1.2; // 20% more alerts during high production
+      }
+      
+      return Math.random() < alertProbability;
+    };
+    
     const interval = setInterval(() => {
-      // 5% chance of a new alert every 45 seconds
-      if (Math.random() < 0.05) {
+      // Check if we should generate a new alert based on operational patterns
+      if (simulateOperationalPatterns()) {
+        // Types of alerts more specific to oil rig operations
+        const alertTypes = [
+          {
+            message: "Pressure valve reading abnormal on wellhead #3",
+            parameter: "pressure",
+            priority: "medium" as "low" | "medium" | "high" | "critical", 
+            threshold: 75
+          },
+          {
+            message: "Temperature exceeding safe levels in pump system",
+            parameter: "temperature",
+            priority: "high" as "low" | "medium" | "high" | "critical",
+            threshold: 90
+          },
+          {
+            message: "H2S gas detection above threshold in sector B",
+            parameter: "gas",
+            priority: "critical" as "low" | "medium" | "high" | "critical",
+            threshold: 10
+          },
+          {
+            message: "Drill pipe vibration exceeding normal range",
+            parameter: "vibration",
+            priority: "medium" as "low" | "medium" | "high" | "critical",
+            threshold: 65
+          },
+          {
+            message: "BOP maintenance required before next operation",
+            parameter: "maintenance",
+            priority: "high" as "low" | "medium" | "high" | "critical",
+            threshold: 48
+          },
+          {
+            message: "PPE compliance below target in drilling area",
+            parameter: "compliance",
+            priority: "low" as "low" | "medium" | "high" | "critical",
+            threshold: 95
+          },
+          {
+            message: "Weather conditions approaching operational limits",
+            parameter: "weather",
+            priority: "medium" as "low" | "medium" | "high" | "critical",
+            threshold: 80
+          },
+          {
+            message: "Mud circulation pressure fluctuating in well #2",
+            parameter: "mud-pressure",
+            priority: "medium" as "low" | "medium" | "high" | "critical",
+            threshold: 60
+          }
+        ];
+        
+        const selectedAlert = alertTypes[Math.floor(Math.random() * alertTypes.length)];
+        
         const newAlert: Alert = {
           id: `alert-${Date.now()}`,
           equipmentId: `equipment-${Math.floor(Math.random() * 10)}`,
           timestamp: new Date(),
-          message: [
-            "Pressure valve reading abnormal",
-            "Temperature exceeding safe levels",
-            "Gas detection above threshold",
-            "Maintenance required soon",
-            "PPE compliance below target"
-          ][Math.floor(Math.random() * 5)],
-          parameter: ["pressure", "temperature", "gas", "maintenance", "compliance"][Math.floor(Math.random() * 5)],
-          value: Math.random() * 100,
-          threshold: 75,
-          priority: ["low", "medium", "high", "critical"][Math.floor(Math.random() * 4)] as "low" | "medium" | "high" | "critical",
+          message: selectedAlert.message,
+          parameter: selectedAlert.parameter,
+          value: selectedAlert.threshold * (0.8 + Math.random() * 0.4), // Value around threshold
+          threshold: selectedAlert.threshold,
+          priority: selectedAlert.priority,
           isAcknowledged: false
         };
         
@@ -105,14 +180,16 @@ const Header: React.FC = () => {
         setActiveAlerts(prevAlerts => [newAlert, ...prevAlerts]);
         setUnreadCount(prev => prev + 1);
         
-        // Show toast notification
-        toast({
-          title: "New Alert",
-          description: newAlert.message,
-          variant: newAlert.priority === "critical" || newAlert.priority === "high" ? "destructive" : "default",
-        });
+        // Show toast notification for critical and high priority alerts only
+        if (newAlert.priority === "critical" || newAlert.priority === "high") {
+          toast({
+            title: newAlert.priority === "critical" ? "CRITICAL ALERT" : "High Priority Alert",
+            description: newAlert.message,
+            variant: "destructive",
+          });
+        }
       }
-    }, 45000);
+    }, 30000); // Check every 30 seconds
     
     return () => clearInterval(interval);
   }, [location.search, toast]);
@@ -159,6 +236,21 @@ const Header: React.FC = () => {
     const diffHours = Math.floor(diffMins / 60);
     if (diffHours < 24) return `${diffHours}h ago`;
     return `${Math.floor(diffHours / 24)}d ago`;
+  };
+
+  // Get appropriate alert icon/class based on priority
+  const getAlertIndicator = (priority: "low" | "medium" | "high" | "critical") => {
+    switch (priority) {
+      case "critical":
+        return "bg-red-500";
+      case "high":
+        return "bg-orange-500";
+      case "medium":
+        return "bg-yellow-500";
+      case "low":
+      default:
+        return "bg-blue-500";
+    }
   };
 
   return (
@@ -227,7 +319,10 @@ const Header: React.FC = () => {
                 <Button variant="outline" size="icon" className="relative">
                   <Bell className="h-4 w-4" />
                   {unreadCount > 0 && (
-                    <span className="absolute top-0 right-0 h-2 w-2 bg-vigia-warning rounded-full animate-pulse"></span>
+                    <span className="absolute top-0 right-0 flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-vigia-warning opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-vigia-warning"></span>
+                    </span>
                   )}
                 </Button>
               </PopoverTrigger>
@@ -237,7 +332,7 @@ const Header: React.FC = () => {
                   <Button 
                     variant="ghost" 
                     size="sm" 
-                    onClick={markAllAsRead}
+                    onClick={markAllRead}
                     disabled={activeAlerts.length === 0}
                     className="h-7 text-xs"
                   >
@@ -253,18 +348,26 @@ const Header: React.FC = () => {
                           "p-3 border-b border-border hover:bg-accent/50 cursor-pointer",
                           alert.priority === 'critical' && "border-l-4 border-l-red-500",
                           alert.priority === 'high' && "border-l-4 border-l-orange-500",
-                          alert.priority === 'medium' && "border-l-4 border-l-yellow-500"
+                          alert.priority === 'medium' && "border-l-4 border-l-yellow-500",
+                          alert.priority === 'low' && "border-l-4 border-l-blue-500"
                         )}
                         onClick={() => markAsRead(alert.id)}
                       >
                         <div className="flex justify-between items-start">
-                          <p className="font-medium text-sm">{alert.message}</p>
+                          <div className="flex items-center gap-2">
+                            <span className={`h-2 w-2 rounded-full ${getAlertIndicator(alert.priority)}`}></span>
+                            <p className="font-medium text-sm">{alert.message}</p>
+                          </div>
                           <span className="text-xs text-muted-foreground">
-                            {formatTimeAgo(new Date(alert.timestamp))}
+                            {formatTimeAgo(alert.timestamp)}
                           </span>
                         </div>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {alert.parameter.charAt(0).toUpperCase() + alert.parameter.slice(1)}
+                        <p className="text-xs text-muted-foreground mt-1 ml-4">
+                          {alert.parameter.charAt(0).toUpperCase() + alert.parameter.slice(1)}: 
+                          {typeof alert.value === 'number' ? ` ${alert.value.toFixed(1)}` : ' N/A'}
+                          {alert.parameter.includes('temperature') ? '°C' : ''}
+                          {alert.parameter.includes('pressure') ? ' PSI' : ''}
+                          {alert.parameter.includes('compliance') || alert.parameter.includes('integrity') ? '%' : ''}
                         </p>
                       </div>
                     ))
