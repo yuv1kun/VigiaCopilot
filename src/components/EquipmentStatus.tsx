@@ -1,47 +1,11 @@
 
 import React from 'react';
 import { Card } from '@/components/ui/card';
-import { HardDrive, Info } from 'lucide-react';
-
-interface EquipmentItem {
-  id: string;
-  name: string;
-  status: 'operational' | 'warning' | 'critical' | 'maintenance';
-  lastInspection: string;
-  healthScore: number;
-}
+import { HardDrive, Info, Power } from 'lucide-react';
+import { useEquipmentStatus } from '@/hooks/useEquipmentStatus';
 
 const EquipmentStatus: React.FC = () => {
-  const equipment: EquipmentItem[] = [
-    {
-      id: "BOP-001",
-      name: "Main Blowout Preventer",
-      status: "operational",
-      lastInspection: "2025-04-30",
-      healthScore: 92
-    },
-    {
-      id: "PMP-114",
-      name: "Hydraulic Pump System",
-      status: "warning",
-      lastInspection: "2025-04-12",
-      healthScore: 76
-    },
-    {
-      id: "PIP-239",
-      name: "Production Pipeline Section P-12",
-      status: "warning",
-      lastInspection: "2025-03-28",
-      healthScore: 81
-    },
-    {
-      id: "CTR-053",
-      name: "Control Module CM-3",
-      status: "operational",
-      lastInspection: "2025-05-01",
-      healthScore: 98
-    }
-  ];
+  const { equipment, isActive } = useEquipmentStatus();
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -50,7 +14,7 @@ const EquipmentStatus: React.FC = () => {
       case 'warning':
         return <span className="text-xs bg-vigia-warning/20 text-vigia-warning py-1 px-2 rounded-full">Warning</span>;
       case 'critical':
-        return <span className="text-xs bg-vigia-danger/20 text-vigia-danger py-1 px-2 rounded-full">Critical</span>;
+        return <span className="text-xs bg-vigia-danger/20 text-vigia-danger py-1 px-2 rounded-full animate-pulse">Critical</span>;
       case 'maintenance':
         return <span className="text-xs bg-vigia-blue/20 text-vigia-blue py-1 px-2 rounded-full">Maintenance</span>;
       default:
@@ -60,7 +24,8 @@ const EquipmentStatus: React.FC = () => {
 
   const getHealthScoreColor = (score: number) => {
     if (score >= 90) return 'bg-vigia-success';
-    if (score >= 70) return 'bg-vigia-warning';
+    if (score >= 75) return 'bg-vigia-warning';
+    if (score >= 60) return 'bg-vigia-teal';
     return 'bg-vigia-danger';
   };
 
@@ -71,9 +36,12 @@ const EquipmentStatus: React.FC = () => {
           <HardDrive className="h-4 w-4 text-vigia-teal" />
           <h2 className="font-medium">Equipment Status</h2>
         </div>
-        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-          <Info className="h-3 w-3" />
-          <span>Autonomous BOP Analytics</span>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <Info className="h-3 w-3" />
+            <span>Autonomous BOP Analytics</span>
+          </div>
+          <div className={`h-2 w-2 rounded-full ${isActive ? 'bg-vigia-success animate-pulse' : 'bg-gray-400'}`}></div>
         </div>
       </div>
       
@@ -91,11 +59,15 @@ const EquipmentStatus: React.FC = () => {
               <div className="mt-3">
                 <div className="flex justify-between items-center text-xs mb-1">
                   <span>Health Score</span>
-                  <span>{item.healthScore}%</span>
+                  <span className={item.status === 'critical' ? 'animate-pulse text-vigia-danger' : ''}>
+                    {item.healthScore.toFixed(1)}%
+                  </span>
                 </div>
                 <div className="w-full h-1.5 bg-muted/30 rounded-full overflow-hidden">
                   <div 
-                    className={`h-full ${getHealthScoreColor(item.healthScore)} rounded-full`} 
+                    className={`h-full ${getHealthScoreColor(item.healthScore)} rounded-full ${
+                      item.status === 'critical' ? 'animate-pulse' : ''
+                    }`}
                     style={{ width: `${item.healthScore}%` }}
                   />
                 </div>
