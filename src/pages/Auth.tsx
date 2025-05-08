@@ -24,20 +24,14 @@ const Auth = () => {
   const [validationError, setValidationError] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  // Skip all email validation - let Supabase handle it with our permissive config
-  // We only need to ensure there's some text before and after an @ symbol
-  const validateEmail = (email: string) => {
-    const parts = email.split('@');
-    return parts.length === 2 && parts[0].length > 0 && parts[1].length > 0;
-  };
-
+  // NO validation - we want to test if Supabase will accept any email
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setValidationError(null);
     setLoading(true);
 
     try {
-      // Minimal validation
+      // Minimal validation - just ensure fields aren't empty
       if (!email || !password) {
         setValidationError('Email and password are required');
         setLoading(false);
@@ -50,14 +44,7 @@ const Auth = () => {
         return;
       }
 
-      // Basic email validation - just make sure it has text before and after an @ symbol
-      if (!validateEmail(email)) {
-        setValidationError('Please enter text before and after the @ symbol');
-        setLoading(false);
-        return;
-      }
-
-      console.log("Attempting to sign up with:", email);
+      console.log("Attempting to sign up with email:", email);
       
       // First create the authentication account with debug options
       const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -75,13 +62,12 @@ const Auth = () => {
 
       if (authError) {
         console.error("Auth error:", authError);
+        console.log("Full error object:", JSON.stringify(authError));
         
-        // Detailed error handling
+        // Special case for email validation errors - show exactly what happened
         if (authError.message.includes('email')) {
           setValidationError(`Email error: ${authError.message}`);
-          console.log("Email validation failed:", email);
-          // Show all available error details for debugging
-          console.log("Full error object:", JSON.stringify(authError));
+          toast.error(`Email error: ${authError.message}. Try using a test+123@example.com format.`);
         } else {
           setValidationError(authError.message);
         }
@@ -112,7 +98,7 @@ const Auth = () => {
           return;
         }
         
-        toast.success('Account created! Check your email for the confirmation link.');
+        toast.success('Account created! Signing you in automatically...');
         
         // Automatically sign in the user after successful signup
         const { error: signInError } = await supabase.auth.signInWithPassword({ 
@@ -193,13 +179,7 @@ const Auth = () => {
     e.preventDefault();
     setValidationError(null);
 
-    // Skip complex validation - just ensure it has text before and after @ symbol
-    if (!validateEmail(email)) {
-      setValidationError('Please enter text before and after the @ symbol');
-      return;
-    }
-
-    // Password validation
+    // Minimal password validation only
     if (password.length < 6) {
       setValidationError('Password must be at least 6 characters');
       return;
@@ -223,6 +203,21 @@ const Auth = () => {
   const removeZone = (zone: string) => {
     setAssignedZones(assignedZones.filter(z => z !== zone));
   };
+
+  // Update the Supabase client to explicitly disable any email validation
+  React.useEffect(() => {
+    const updateAuthParams = async () => {
+      try {
+        await supabase.functions.invoke('disable-email-validation', {
+          method: 'POST',
+        });
+      } catch (err) {
+        console.log('Unable to disable email validation via function, continuing anyway');
+      }
+    };
+    
+    updateAuthParams();
+  }, []);
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-background p-4">
@@ -252,8 +247,8 @@ const Auth = () => {
                   <Label htmlFor="signin-email">Email</Label>
                   <Input 
                     id="signin-email" 
-                    type="email" 
-                    placeholder="your.name@example.com"
+                    type="text" 
+                    placeholder="any@example.com"
                     value={email}
                     onChange={(e) => {
                       setEmail(e.target.value);
@@ -300,8 +295,8 @@ const Auth = () => {
                     <Label htmlFor="signup-email">Email</Label>
                     <Input 
                       id="signup-email" 
-                      type="email" 
-                      placeholder="any@example.com"
+                      type="text" 
+                      placeholder="Try test+123@example.com"
                       value={email}
                       onChange={(e) => {
                         setEmail(e.target.value);
@@ -310,7 +305,7 @@ const Auth = () => {
                       required
                     />
                     <p className="text-xs text-muted-foreground">
-                      Just enter any text with an @ symbol in the middle
+                      Try using test+123@example.com format if other emails don't work
                     </p>
                   </div>
                   

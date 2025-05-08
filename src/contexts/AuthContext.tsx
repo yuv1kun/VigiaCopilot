@@ -10,6 +10,7 @@ interface AuthContextType {
   loading: boolean;
   signOut: () => Promise<void>;
   refreshSession: () => Promise<void>;
+  debugAuthState: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -18,6 +19,7 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   signOut: async () => {},
   refreshSession: async () => {},
+  debugAuthState: async () => {},
 });
 
 export const useAuth = () => {
@@ -50,6 +52,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('Exception refreshing session:', error);
     }
   };
+  
+  const debugAuthState = async () => {
+    try {
+      // Check session
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      console.log('Current session data:', sessionData);
+      if (sessionError) console.error('Session error:', sessionError);
+      
+      // Check user
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      console.log('Current user data:', userData);
+      if (userError) console.error('User error:', userError);
+      
+      // Check auth settings if possible
+      try {
+        const { data, error } = await supabase.from('auth.config').select('*');
+        if (data) console.log('Auth config:', data);
+        if (error) console.log('Cannot query auth config:', error);
+      } catch (e) {
+        console.log('Auth config check failed, expected for regular users');
+      }
+      
+      toast.info('Auth debug info logged to console');
+    } catch (e) {
+      console.error('Debug auth state error:', e);
+    }
+  };
 
   useEffect(() => {
     // Get initial session
@@ -78,8 +107,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        console.log('Auth state changed:', _event, session ? 'User authenticated' : 'No user');
+      (event, session) => {
+        console.log('Auth state changed:', event, session ? 'User authenticated' : 'No user');
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
@@ -107,6 +136,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     loading,
     signOut,
     refreshSession,
+    debugAuthState,
   };
 
   return (
