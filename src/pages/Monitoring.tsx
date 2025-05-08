@@ -2,6 +2,7 @@
 import React from 'react';
 import Header from '@/components/Header';
 import MonitoringPanel from '@/components/MonitoringPanel';
+import RealTimeEquipment from '@/components/RealTimeEquipment';
 
 const Monitoring: React.FC = () => {
   return (
@@ -10,7 +11,11 @@ const Monitoring: React.FC = () => {
       <main className="flex-1">
         <div className="container mx-auto py-6 px-4">
           <h1 className="text-2xl font-bold mb-6">Monitoring Dashboard</h1>
-          <MonitoringPanel />
+          
+          <div className="space-y-8">
+            <RealTimeEquipment />
+            <MonitoringPanel />
+          </div>
         </div>
       </main>
       <footer className="py-4 px-6 border-t border-border">
