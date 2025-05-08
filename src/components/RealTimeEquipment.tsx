@@ -273,12 +273,12 @@ const EquipmentCard: React.FC<{ equipment: EquipmentData }> = ({ equipment }) =>
             </div>
             <Progress 
               value={equipment.efficiency} 
-              className="h-2"
-              indicatorClassName={
-                equipment.efficiency > 90 ? "bg-vigia-success" : 
-                equipment.efficiency > 80 ? "bg-vigia-teal" : 
-                equipment.efficiency > 70 ? "bg-amber-500" : "bg-vigia-warning"
-              }
+              className={`h-2 ${
+                equipment.efficiency > 90 ? "bg-secondary [&>div]:bg-vigia-success" : 
+                equipment.efficiency > 80 ? "bg-secondary [&>div]:bg-vigia-teal" : 
+                equipment.efficiency > 70 ? "bg-secondary [&>div]:bg-amber-500" : 
+                "bg-secondary [&>div]:bg-vigia-warning"
+              }`}
             />
           </div>
           
