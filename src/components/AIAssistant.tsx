@@ -1,14 +1,17 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Bell, ArrowRight, Activity, FileText, Database, VolumeX, Volume2, Key, User } from 'lucide-react';
+import { Bell, ArrowRight, Activity, FileText, Database, VolumeX, Volume2, Key, User, AlertTriangle } from 'lucide-react';
 import { SystemStatus } from '@/types/equipment';
 import { speak, stopSpeaking, getVoices } from '@/utils/textToSpeech';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useRealTimeMonitoring } from '@/hooks/useRealTimeMonitoring';
+import { useEquipmentStatus } from '@/hooks/useEquipmentStatus';
 import { 
   getGeminiApiKey, 
   setGeminiApiKey, 
@@ -17,140 +20,13 @@ import {
   MessageRole,
   GeminiMessage 
 } from '@/utils/geminiAPI';
-
-// Simulated system status for the AI assistant
-const simulatedSystemStatus: SystemStatus = {
-  equipmentStatus: {
-    'pump-001': {
-      id: 'pump-001',
-      name: 'Primary Pump',
-      type: 'pump',
-      status: 'running',
-      pressure: 1250,
-      temperature: 65,
-      vibration: 0.8,
-      rpm: 1800,
-      efficiency: 92,
-      operatingHours: 2450,
-      lastMaintenance: '2025-04-12',
-      maintenanceDue: 7,
-      healthScore: 87,
-      history: []
-    },
-    'comp-002': {
-      id: 'comp-002',
-      name: 'Main Compressor',
-      type: 'compressor',
-      status: 'running',
-      pressure: 850,
-      temperature: 72,
-      vibration: 1.2,
-      rpm: 3600,
-      efficiency: 88,
-      operatingHours: 1850,
-      lastMaintenance: '2025-04-15',
-      maintenanceDue: 14,
-      healthScore: 92,
-      history: []
-    }
-  },
-  activeAlerts: [
-    {
-      id: 'alert-001',
-      equipmentId: 'pump-003',
-      timestamp: new Date(),
-      message: 'Wellhead temperature exceeding normal range',
-      parameter: 'temperature',
-      value: 78.2,
-      threshold: 75.0,
-      priority: 'medium',
-      isAcknowledged: false
-    }
-  ],
-  maintenanceSchedule: [
-    {
-      id: 'maint-001',
-      equipmentId: 'pump-001',
-      scheduledDate: new Date(new Date().getTime() + 7 * 24 * 60 * 60 * 1000),
-      type: 'preventive',
-      description: 'BOP seal replacement',
-      estimatedDuration: 4,
-      technicians: ['T. Johnson', 'M. Smith'],
-      priority: 'high'
-    }
-  ]
-};
+import { SAFETY_PARAMETERS, SAFETY_THRESHOLDS } from '@/utils/monitoringUtils';
 
 // Define message type for local state management
 interface Message {
   role: MessageRole;
   content: string;
 }
-
-// Generate context-aware AI responses
-const generateAIResponse = (query: string, systemStatus: SystemStatus): string => {
-  const lowercaseQuery = query.toLowerCase();
-  
-  // Safety protocol queries
-  if (lowercaseQuery.includes('safety') && lowercaseQuery.includes('protocol')) {
-    return 'According to OSHA regulation 1910.119, all personnel must evacuate platform deck C when H2S levels exceed 10ppm. Current protocols require use of breathing apparatus in affected areas.';
-  }
-  
-  // Maintenance queries with context
-  if (lowercaseQuery.includes('maintenance')) {
-    // Look for equipment-specific maintenance
-    if (lowercaseQuery.includes('pump')) {
-      const pumpStatus = systemStatus.equipmentStatus['pump-001'];
-      return `Next scheduled maintenance for ${pumpStatus.name} is in ${pumpStatus.maintenanceDue} days. The maintenance will include seal replacement based on the current vibration pattern of ${pumpStatus.vibration.toFixed(2)} mm/s, which is ${pumpStatus.vibration > 1.0 ? 'above' : 'within'} normal parameters.`;
-    }
-    
-    // General maintenance query
-    const nextMaintenance = systemStatus.maintenanceSchedule.sort((a, b) => 
-      a.scheduledDate.getTime() - b.scheduledDate.getTime()
-    )[0];
-    
-    const daysUntilMaintenance = Math.ceil((nextMaintenance.scheduledDate.getTime() - new Date().getTime()) / (24 * 60 * 60 * 1000));
-    
-    return `Next scheduled maintenance is ${nextMaintenance.type} maintenance for ${systemStatus.equipmentStatus[nextMaintenance.equipmentId]?.name || nextMaintenance.equipmentId} in ${daysUntilMaintenance} days. ${nextMaintenance.description}. Required technicians: ${nextMaintenance.technicians.join(', ')}.`;
-  }
-  
-  // Status queries with contextual data
-  if (lowercaseQuery.includes('status')) {
-    const criticalEquipment = Object.values(systemStatus.equipmentStatus).filter(eq => 
-      eq.status === 'warning' || eq.status === 'failure'
-    );
-    
-    if (criticalEquipment.length > 0) {
-      return `ATTENTION: ${criticalEquipment.length} ${criticalEquipment.length === 1 ? 'piece' : 'pieces'} of equipment ${criticalEquipment.length === 1 ? 'requires' : 'require'} attention. ${criticalEquipment.map(eq => `${eq.name} is in ${eq.status.toUpperCase()} state with ${eq.temperature.toFixed(1)}°C temperature and ${eq.vibration.toFixed(2)} mm/s vibration.`).join(' ')}`;
-    } else {
-      return `All critical systems are operational. There are ${systemStatus.activeAlerts.length} active alerts that should be monitored. The overall system health is good with all equipment operating within normal parameters.`;
-    }
-  }
-  
-  // Weather queries with simulated data
-  if (lowercaseQuery.includes('weather')) {
-    return 'Current weather conditions: Wind 15 knots NE, Wave height 1.8m, Visibility 8km. Weather warning: Potential storm system approaching in 36 hours.';
-  }
-  
-  // Emergency queries
-  if (lowercaseQuery.includes('emergency')) {
-    return '⚠️ EMERGENCY PROTOCOL ACTIVATED. Alerting all supervisors. Please provide exact location and nature of emergency. Dispatching response team to your location.';
-  }
-  
-  // Historical data analysis
-  if (lowercaseQuery.includes('historical') || lowercaseQuery.includes('history')) {
-    const equipment = lowercaseQuery.includes('compressor') ? 'Main Compressor' : 'Primary Pump';
-    return `Historical analysis for ${equipment}: Performance trends show a 3.2% efficiency decrease over the past 30 days. Vibration patterns indicate early signs of bearing wear. Recommendation: Schedule preventive maintenance within the next 14 days to avoid potential failure.`;
-  }
-  
-  // Predictive analysis
-  if (lowercaseQuery.includes('predict') || lowercaseQuery.includes('forecast')) {
-    return 'Predictive analysis based on current sensor data: The Main Compressor has an 87% probability of requiring maintenance within 21 days. The Secondary Pump shows early warning signs of seal degradation with an estimated 45 days until failure threshold is reached.';
-  }
-  
-  // Default response with guidance
-  return 'I can help with information about safety protocols, maintenance schedules, equipment status, historical analysis, and weather conditions. How can I assist you?';
-};
 
 const AIAssistant: React.FC = () => {
   const { user } = useAuth();
@@ -160,7 +36,6 @@ const AIAssistant: React.FC = () => {
     { role: 'system', content: 'Welcome to Vigía AI Assistant. How can I help you today?' },
   ]);
   const [isTyping, setIsTyping] = useState(false);
-  const [systemStatus, setSystemStatus] = useState<SystemStatus>(simulatedSystemStatus);
   const [suggestedQueries, setSuggestedQueries] = useState([
     'What is the current equipment status?',
     'When is the next maintenance scheduled?',
@@ -173,6 +48,86 @@ const AIAssistant: React.FC = () => {
   const [showApiKeyDialog, setShowApiKeyDialog] = useState(false);
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [apiKeyExists, setApiKeyExists] = useState(false);
+  
+  // Connect to real-time monitoring data
+  const monitoringData = useRealTimeMonitoring();
+  const { equipment } = useEquipmentStatus(true);
+  
+  // Reference to latest monitoring data for use in response generation
+  const liveSystemStatus = useRef<SystemStatus>({
+    equipmentStatus: {},
+    activeAlerts: [],
+    maintenanceSchedule: []
+  });
+
+  // Update system status when monitoring data changes
+  useEffect(() => {
+    // Create simulated system status based on real-time data
+    const updatedStatus: SystemStatus = {
+      equipmentStatus: {
+        'pump-001': {
+          id: 'pump-001',
+          name: 'Primary Pump',
+          type: 'pump',
+          status: monitoringData.bopPressure.status === 'alert' ? 'warning' : 'running',
+          pressure: parseFloat(monitoringData.bopPressure.value.toFixed(0)),
+          temperature: parseFloat(monitoringData.wellheadTemperature.value.toFixed(1)),
+          vibration: 0.8 + ((monitoringData.wellheadTemperature.value - 85) * 0.01),
+          rpm: 1800 + ((monitoringData.bopPressure.value - 1400) * 0.1),
+          efficiency: 92 - ((monitoringData.wellheadTemperature.value - 85) * 0.2),
+          operatingHours: 2450,
+          lastMaintenance: '2025-04-12',
+          maintenanceDue: monitoringData.nextMaintenance.value,
+          healthScore: 100 - ((monitoringData.wellheadTemperature.value - 85) * 0.5),
+          history: []
+        },
+        'comp-002': {
+          id: 'comp-002',
+          name: 'Main Compressor',
+          type: 'compressor',
+          status: monitoringData.gasDetection.status === 'alert' ? 'warning' : 'running',
+          pressure: 850 - ((monitoringData.wellheadTemperature.value - 85) * 2),
+          temperature: parseFloat(monitoringData.wellheadTemperature.value.toFixed(1)),
+          vibration: 1.2 + ((monitoringData.gasDetection.value - 3) * 0.05),
+          rpm: 3600,
+          efficiency: 88 - ((monitoringData.gasDetection.value - 3) * 0.8),
+          operatingHours: 1850,
+          lastMaintenance: '2025-04-15',
+          maintenanceDue: monitoringData.nextMaintenance.value + 7,
+          healthScore: 92 - ((monitoringData.gasDetection.value - 3) * 1.2),
+          history: []
+        }
+      },
+      activeAlerts: [
+        {
+          id: 'alert-001',
+          equipmentId: monitoringData.wellheadTemperature.status === 'alert' ? 'pump-001' : 'pump-003',
+          timestamp: new Date(),
+          message: `${monitoringData.wellheadTemperature.status === 'alert' ? 'Critical: ' : ''}Wellhead temperature ${monitoringData.wellheadTemperature.formattedValue} exceeding normal range`,
+          parameter: 'temperature',
+          value: monitoringData.wellheadTemperature.value,
+          threshold: SAFETY_THRESHOLDS.wellheadTemperature.warning,
+          priority: monitoringData.wellheadTemperature.status === 'alert' ? 'critical' : 'medium',
+          isAcknowledged: false
+        }
+      ],
+      maintenanceSchedule: [
+        {
+          id: 'maint-001',
+          equipmentId: 'pump-001',
+          scheduledDate: new Date(new Date().getTime() + monitoringData.nextMaintenance.value * 24 * 60 * 60 * 1000),
+          type: monitoringData.sealIntegrity.value < 90 ? 'corrective' : 'preventive',
+          description: monitoringData.sealIntegrity.value < 90 ? 'Urgent seal replacement' : 'BOP seal replacement',
+          estimatedDuration: 4,
+          technicians: ['T. Johnson', 'M. Smith'],
+          priority: monitoringData.sealIntegrity.value < 85 ? 'high' : 'medium'
+        }
+      ]
+    };
+    
+    // Update our reference for the live system status
+    liveSystemStatus.current = updatedStatus;
+  }, [monitoringData, equipment]);
 
   // Check if API key exists on component mount
   useEffect(() => {
@@ -220,40 +175,118 @@ const AIAssistant: React.FC = () => {
     }
   }, [messages, isSpeechEnabled]);
 
-  // Update system status periodically to simulate real-time changes
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setSystemStatus(prev => {
-        const updated = { ...prev };
-        
-        // Update equipment readings slightly
-        Object.keys(updated.equipmentStatus).forEach(key => {
-          const equipment = updated.equipmentStatus[key];
-          equipment.temperature += (Math.random() - 0.5) * 0.2;
-          equipment.vibration += (Math.random() - 0.5) * 0.05;
-          equipment.pressure += (Math.random() - 0.5) * 20;
-        });
-        
-        return updated;
-      });
-    }, 5000);
+  // Generate context-aware AI responses using current monitoring data
+  const generateLocalResponse = (query: string): string => {
+    const lowercaseQuery = query.toLowerCase();
+    const systemStatus = liveSystemStatus.current;
     
-    return () => clearInterval(interval);
-  }, []);
+    // Safety protocol queries
+    if (lowercaseQuery.includes('safety') && lowercaseQuery.includes('protocol')) {
+      return `According to OSHA regulation 1910.119, all personnel must evacuate platform deck C when H2S levels exceed 10ppm. Current H2S levels are at ${monitoringData.gasDetection.formattedValue} (${monitoringData.gasDetection.status} status). Current protocols require use of breathing apparatus in ${monitoringData.gasDetection.value > 5.0 ? 'all affected' : 'high-risk'} areas.`;
+    }
+    
+    // Maintenance queries with context
+    if (lowercaseQuery.includes('maintenance')) {
+      // Look for equipment-specific maintenance
+      if (lowercaseQuery.includes('pump')) {
+        const pumpData = systemStatus.equipmentStatus['pump-001'];
+        return `Next scheduled maintenance for ${pumpData.name} is in ${monitoringData.nextMaintenance.formattedValue} (${monitoringData.nextMaintenance.status} status). The maintenance will include seal replacement based on the current seal integrity of ${monitoringData.sealIntegrity.formattedValue} and vibration pattern of ${pumpData.vibration.toFixed(2)} mm/s, which is ${pumpData.vibration > 1.0 ? 'above' : 'within'} normal parameters.`;
+      }
+      
+      // General maintenance query
+      const nextMaintenance = systemStatus.maintenanceSchedule[0];
+      const equipmentId = nextMaintenance.equipmentId;
+      const equipmentName = systemStatus.equipmentStatus[equipmentId]?.name || equipmentId;
+      
+      const daysUntilMaintenance = Math.ceil((nextMaintenance.scheduledDate.getTime() - new Date().getTime()) / (24 * 60 * 60 * 1000));
+      
+      return `Next scheduled maintenance is ${nextMaintenance.type} maintenance for ${equipmentName} in ${daysUntilMaintenance} days. ${nextMaintenance.description}. Required technicians: ${nextMaintenance.technicians.join(', ')}. Current seal integrity is at ${monitoringData.sealIntegrity.formattedValue} (${monitoringData.sealIntegrity.status} status).`;
+    }
+    
+    // Status queries with contextual data
+    if (lowercaseQuery.includes('status')) {
+      // Add real equipment from useEquipmentStatus hook
+      const criticalEquipment = equipment.filter(eq => 
+        eq.status === 'warning' || eq.status === 'critical'
+      );
+      
+      if (criticalEquipment.length > 0) {
+        return `ATTENTION: ${criticalEquipment.length} ${criticalEquipment.length === 1 ? 'piece' : 'pieces'} of equipment ${criticalEquipment.length === 1 ? 'requires' : 'require'} attention. ${criticalEquipment.map(eq => `${eq.name} is in ${eq.status.toUpperCase()} state with a health score of ${eq.healthScore.toFixed(1)}%.`).join(' ')} Additionally, BOP pressure is currently at ${monitoringData.bopPressure.formattedValue} (${monitoringData.bopPressure.status} status).`;
+      } else {
+        return `All critical systems are operational. Current key readings: BOP pressure at ${monitoringData.bopPressure.formattedValue} (${monitoringData.bopPressure.status} status), wellhead temperature at ${monitoringData.wellheadTemperature.formattedValue} (${monitoringData.wellheadTemperature.status} status), and gas detection at ${monitoringData.gasDetection.formattedValue} (${monitoringData.gasDetection.status} status).`;
+      }
+    }
+    
+    // Weather queries with simulated data that varies based on time
+    if (lowercaseQuery.includes('weather')) {
+      const hour = new Date().getHours();
+      const windSpeed = 10 + (Math.sin(hour / 24 * 2 * Math.PI) * 5) + Math.random() * 2;
+      const waveHeight = 1.2 + (Math.sin((hour + 3) / 24 * 2 * Math.PI) * 0.6) + Math.random() * 0.3;
+      const visibility = 10 - (Math.sin((hour + 6) / 24 * 2 * Math.PI) * 2) - Math.random() * 2;
+      
+      return `Current weather conditions: Wind ${windSpeed.toFixed(1)} knots ${hour < 12 ? 'NE' : 'SW'}, Wave height ${waveHeight.toFixed(1)}m, Visibility ${Math.max(1, visibility).toFixed(1)}km. ${visibility < 5 ? '⚠️ Low visibility advisory in effect.' : ''} ${waveHeight > 2.0 ? '⚠️ High wave warning.' : ''} Wellhead temperature is currently ${monitoringData.wellheadTemperature.formattedValue} (${monitoringData.wellheadTemperature.trend.direction === 'up' ? 'rising' : monitoringData.wellheadTemperature.trend.direction === 'down' ? 'falling' : 'stable'}).`;
+    }
+    
+    // Emergency queries
+    if (lowercaseQuery.includes('emergency')) {
+      // Check for actual alerts in the system
+      const highPriorityAlerts = systemStatus.activeAlerts.filter(alert => 
+        alert.priority === 'high' || alert.priority === 'critical'
+      );
+      
+      if (highPriorityAlerts.length > 0) {
+        return `⚠️ EMERGENCY PROTOCOL ACTIVATED. ${highPriorityAlerts.length} high-priority ${highPriorityAlerts.length === 1 ? 'alert has' : 'alerts have'} been detected: ${highPriorityAlerts.map(alert => alert.message).join('; ')}. Current wellhead temperature: ${monitoringData.wellheadTemperature.formattedValue}, gas levels: ${monitoringData.gasDetection.formattedValue}. Please provide exact location and nature of response required.`;
+      }
+      
+      return `⚠️ EMERGENCY PROTOCOL ACTIVATED. Alerting all supervisors. Please provide exact location and nature of emergency. Current BOP pressure is ${monitoringData.bopPressure.formattedValue} (${monitoringData.bopPressure.status} status), wellhead temperature is ${monitoringData.wellheadTemperature.formattedValue} (${monitoringData.wellheadTemperature.status} status).`;
+    }
+    
+    // Historical data analysis
+    if (lowercaseQuery.includes('historical') || lowercaseQuery.includes('history')) {
+      const equipment = lowercaseQuery.includes('compressor') ? 'Main Compressor' : 'Primary Pump';
+      const tempTrend = monitoringData.wellheadTemperature.trend.direction;
+      const pressureTrend = monitoringData.bopPressure.trend.direction;
+      
+      return `Historical analysis for ${equipment}: Performance trends show a ${tempTrend === 'up' ? 'rising' : tempTrend === 'down' ? 'falling' : 'stable'} temperature pattern over the past 30 days. Current temperature is ${monitoringData.wellheadTemperature.formattedValue} with pressure at ${monitoringData.bopPressure.formattedValue} (${pressureTrend === 'up' ? 'rising' : pressureTrend === 'down' ? 'falling' : 'stable'}). Vibration patterns indicate ${monitoringData.sealIntegrity.value < 90 ? 'concerning' : 'normal'} seal integrity at ${monitoringData.sealIntegrity.formattedValue}. Recommendation: Schedule preventive maintenance within the next ${monitoringData.nextMaintenance.formattedValue}.`;
+    }
+    
+    // Predictive analysis
+    if (lowercaseQuery.includes('predict') || lowercaseQuery.includes('forecast')) {
+      const sealDegradation = 100 - monitoringData.sealIntegrity.value;
+      const predictedDaysTillMaintenance = Math.max(1, Math.round(monitoringData.nextMaintenance.value * 0.8));
+      const sealFailureDays = Math.max(15, Math.round(45 * monitoringData.sealIntegrity.value / 100));
+      
+      return `Predictive analysis based on current sensor data: The Main Compressor has a ${100 - Math.round(sealDegradation / 2)}% probability of requiring maintenance within ${predictedDaysTillMaintenance} days. The BOP seal shows ${sealDegradation > 10 ? 'early warning signs of degradation' : 'normal wear patterns'} with an estimated ${sealFailureDays} days until failure threshold is reached. Current wellhead temperature is ${monitoringData.wellheadTemperature.formattedValue}, trending ${monitoringData.wellheadTemperature.trend.direction}.`;
+    }
+    
+    // Default response with guidance
+    return `I can help with information about safety protocols, maintenance schedules, equipment status, historical analysis, and weather conditions. Current key readings: BOP pressure at ${monitoringData.bopPressure.formattedValue} (${monitoringData.bopPressure.status}), wellhead temperature at ${monitoringData.wellheadTemperature.formattedValue} (${monitoringData.wellheadTemperature.status}), and gas detection at ${monitoringData.gasDetection.formattedValue} (${monitoringData.gasDetection.status}). How can I assist you today?`;
+  };
 
-  // Generate AI response using Gemini API
+  // Generate AI response using Gemini API or fall back to local response
   const getAIResponse = async (query: string): Promise<string> => {
     const hasKey = await hasGeminiApiKey();
     if (!hasKey) {
-      setShowApiKeyDialog(true);
-      return "Please provide a Gemini API key to enable AI responses.";
+      // Fall back to local response if no API key is available
+      console.log("No API key available, using local response generator");
+      return generateLocalResponse(query);
     }
     
     try {
-      // Context for Gemini API
+      // Context for Gemini API using current live data
       const systemContext = `You are Vigía AI Assistant, an AI assistant for an offshore oil rig safety monitoring system.
       You should respond to queries about equipment status, maintenance schedules, safety protocols, and operational procedures.
-      Current system status: ${JSON.stringify(systemStatus)}`;
+      Current system status: ${JSON.stringify(liveSystemStatus.current)}
+      
+      Current sensor readings:
+      - BOP Pressure: ${monitoringData.bopPressure.formattedValue} (${monitoringData.bopPressure.status} status)
+      - Wellhead Temperature: ${monitoringData.wellheadTemperature.formattedValue} (${monitoringData.wellheadTemperature.status} status)
+      - Gas Detection: ${monitoringData.gasDetection.formattedValue} (${monitoringData.gasDetection.status} status)
+      - Seal Integrity: ${monitoringData.sealIntegrity.formattedValue} (${monitoringData.sealIntegrity.status} status)
+      - Pipe Corrosion: ${monitoringData.pipeCorrosion.formattedValue} (${monitoringData.pipeCorrosion.status} status)
+      - Next Maintenance: ${monitoringData.nextMaintenance.formattedValue} (${monitoringData.nextMaintenance.status} status)
+      
+      Always include specific current values in your responses. Be precise and reference the most recent data.`;
       
       // Convert chat history to Gemini format
       const geminiMessages: GeminiMessage[] = messages.slice(-5).map(msg => ({
@@ -264,12 +297,23 @@ const AIAssistant: React.FC = () => {
       // Add user's new query
       geminiMessages.push({ role: 'user', content: query });
       
-      // Call Gemini API
-      const response = await generateGeminiResponse(geminiMessages, systemContext);
+      // Call Gemini API with timeout
+      const responsePromise = generateGeminiResponse(geminiMessages, systemContext);
+      
+      // Set a timeout for the API call (8 seconds)
+      const timeoutPromise = new Promise<string>((_, reject) => {
+        setTimeout(() => reject(new Error("Gemini API request timed out")), 8000);
+      });
+      
+      // Race between the API call and timeout
+      const response = await Promise.race([responsePromise, timeoutPromise]);
       return response;
     } catch (error) {
       console.error('Error generating AI response:', error);
-      return "I'm having trouble connecting to my knowledge base. Please check your API key or try again later.";
+      
+      // Fallback to local response generation
+      console.log("Falling back to local response generator");
+      return generateLocalResponse(query);
     }
   };
 
@@ -294,7 +338,7 @@ const AIAssistant: React.FC = () => {
     }
     
     try {
-      // Get AI response from Gemini
+      // Get AI response from Gemini or fallback
       const aiResponse = await getAIResponse(inputValue);
       
       setMessages([
@@ -317,12 +361,19 @@ const AIAssistant: React.FC = () => {
           'Are there any correlated warnings across systems?',
           'What is the current health score of the primary pump?'
         ]);
+      } else if (inputValue.toLowerCase().includes('emergency')) {
+        setSuggestedQueries([
+          'What is the emergency response protocol?',
+          'Show me the evacuation routes',
+          'What is the status of safety systems?',
+          'Who is the emergency response team leader?'
+        ]);
       }
     } catch (error) {
       // Handle error
       setMessages([
         ...newMessages,
-        { role: 'system', content: "I'm sorry, I encountered an error processing your request." }
+        { role: 'system', content: "I'm sorry, I encountered an error processing your request. Please try again or check your connection." }
       ]);
       console.error('Error in AI response:', error);
     } finally {
@@ -369,6 +420,19 @@ const AIAssistant: React.FC = () => {
     navigate('/profile');
   };
 
+  // Get an appropriate icon based on system status
+  const getStatusIcon = () => {
+    const hasAlertStatus = monitoringData.bopPressure.status === 'alert' || 
+                         monitoringData.wellheadTemperature.status === 'alert' ||
+                         monitoringData.gasDetection.status === 'alert';
+                         
+    if (hasAlertStatus) {
+      return <AlertTriangle className="h-4 w-4 text-vigia-danger animate-pulse" />;
+    }
+    
+    return <Activity className="h-4 w-4 text-vigia-teal" />;
+  };
+
   return (
     <>
       <Card className="bg-vigia-card border-border h-full flex flex-col">
@@ -378,6 +442,14 @@ const AIAssistant: React.FC = () => {
             <h2 className="font-medium">Vigía AI Assistant</h2>
           </div>
           <div className="flex items-center gap-2">
+            <div className="flex items-center text-xs text-muted-foreground mr-2">
+              {getStatusIcon()}
+              <span className="ml-1">
+                {monitoringData.bopPressure.status === 'alert' || monitoringData.wellheadTemperature.status === 'alert' || monitoringData.gasDetection.status === 'alert' 
+                  ? 'Alert status' 
+                  : 'System nominal'}
+              </span>
+            </div>
             <Button 
               variant="ghost" 
               size="icon" 

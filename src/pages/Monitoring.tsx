@@ -27,7 +27,7 @@ const Monitoring: React.FC = () => {
               <div className="lg:col-span-2">
                 <MonitoringPanel />
               </div>
-              <div className="space-y-6">
+              <div className="lg:col-span-1 h-full">
                 <AIAssistant />
               </div>
             </div>
