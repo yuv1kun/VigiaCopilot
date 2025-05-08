@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Bell, Eye, Gauge, Shield, Wrench } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -332,7 +331,7 @@ const Header: React.FC = () => {
                   <Button 
                     variant="ghost" 
                     size="sm" 
-                    onClick={markAllRead}
+                    onClick={markAllAsRead}
                     disabled={activeAlerts.length === 0}
                     className="h-7 text-xs"
                   >
