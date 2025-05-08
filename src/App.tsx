@@ -12,6 +12,7 @@ import Maintenance from "./pages/Maintenance";
 import Alerts from "./pages/Alerts";
 import Profile from "./pages/Profile";
 import Auth from "./pages/Auth";
+import Analytics from "./pages/Analytics";
 
 const AppRoutes = () => {
   return (
@@ -23,6 +24,7 @@ const AppRoutes = () => {
         <Route path="/monitoring" element={<Monitoring />} />
         <Route path="/maintenance" element={<Maintenance />} />
         <Route path="/alerts" element={<Alerts />} />
+        <Route path="/analytics" element={<Analytics />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>

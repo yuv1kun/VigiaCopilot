@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import Header from '@/components/Header';
 import MonitoringPanel from '@/components/MonitoringPanel';
 import RealTimeEquipment from '@/components/RealTimeEquipment';
@@ -8,6 +9,8 @@ import AlertSystem from '@/components/AlertSystem';
 import EquipmentStatus from '@/components/EquipmentStatus';
 
 const Monitoring: React.FC = () => {
+  const navigate = useNavigate();
+  
   return (
     <div className="min-h-screen flex flex-col bg-vigia-bg text-foreground">
       <Header />
@@ -47,7 +50,10 @@ const Monitoring: React.FC = () => {
                   <div className="text-center text-muted-foreground h-[80%] flex items-center justify-center text-sm">
                     <div>
                       <p>Historical data visualization available in the Analytics section</p>
-                      <button className="mt-4 text-vigia-teal hover:underline">
+                      <button 
+                        className="mt-4 text-vigia-teal hover:underline"
+                        onClick={() => navigate('/analytics')}
+                      >
                         View Analytics Dashboard
                       </button>
                     </div>
