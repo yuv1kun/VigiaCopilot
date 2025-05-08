@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Bell, ArrowRight, Activity, FileText, Database, VolumeX, Volume2 } from 'lucide-react';
 import { SystemStatus } from '@/types/equipment';
-import { speak, stopSpeaking } from '@/utils/textToSpeech';
+import { speak, stopSpeaking, getVoices } from '@/utils/textToSpeech';
 
 // Simulated system status for the AI assistant
 const simulatedSystemStatus: SystemStatus = {
@@ -148,6 +148,41 @@ const AIAssistant: React.FC = () => {
     'What are the current safety protocols?'
   ]);
   const [isSpeechEnabled, setIsSpeechEnabled] = useState(false);
+  const [voicesLoaded, setVoicesLoaded] = useState(false);
+  const lastResponseRef = useRef<string>('');
+
+  // Initialize speech synthesis voices when component mounts
+  useEffect(() => {
+    const initVoices = async () => {
+      try {
+        const voices = await getVoices();
+        console.log(`AIAssistant: Loaded ${voices.length} voices`);
+        setVoicesLoaded(voices.length > 0);
+      } catch (error) {
+        console.error('Error initializing voices:', error);
+      }
+    };
+    
+    initVoices();
+    
+    return () => {
+      stopSpeaking();
+    };
+  }, []);
+
+  // Handle speech for the latest system message
+  useEffect(() => {
+    const lastMessage = messages[messages.length - 1];
+    
+    // Only speak system messages (AI responses) and only when speech is enabled
+    if (lastMessage?.role === 'system' && isSpeechEnabled && lastMessage.content !== lastResponseRef.current) {
+      lastResponseRef.current = lastMessage.content;
+      console.log('Speaking message:', lastMessage.content);
+      speak(lastMessage.content).catch(err => {
+        console.error('Speech error:', err);
+      });
+    }
+  }, [messages, isSpeechEnabled]);
 
   // Update system status periodically to simulate real-time changes
   useEffect(() => {
@@ -170,24 +205,6 @@ const AIAssistant: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Initialize speech synthesis voices when component mounts
-  useEffect(() => {
-    // Chrome needs a trigger to load voices
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.onvoiceschanged = () => {
-        // This event fires when voices are available
-        // No action needed here, just ensuring voices are loaded
-      };
-      // Try to load voices immediately
-      window.speechSynthesis.getVoices();
-    }
-    
-    // Clean up speech when component unmounts
-    return () => {
-      stopSpeaking();
-    };
-  }, []);
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -203,6 +220,11 @@ const AIAssistant: React.FC = () => {
     setInputValue('');
     setIsTyping(true);
     
+    // Stop any ongoing speech when user sends a message
+    if (isSpeechEnabled) {
+      stopSpeaking();
+    }
+    
     // Simulate AI thinking and typing
     setTimeout(() => {
       const aiResponse = generateAIResponse(inputValue, systemStatus);
@@ -213,10 +235,7 @@ const AIAssistant: React.FC = () => {
       ]);
       setIsTyping(false);
       
-      // Speak the response if speech is enabled
-      if (isSpeechEnabled) {
-        speak(aiResponse);
-      }
+      // Speech is now handled by useEffect
       
       // Update suggested queries based on the conversation
       if (inputValue.toLowerCase().includes('maintenance')) {
@@ -244,6 +263,14 @@ const AIAssistant: React.FC = () => {
   const toggleSpeech = () => {
     if (isSpeechEnabled) {
       stopSpeaking();
+    } else {
+      // If enabling speech, speak the last message
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage?.role === 'system') {
+        speak(lastMessage.content).catch(err => {
+          console.error('Error speaking last message:', err);
+        });
+      }
     }
     setIsSpeechEnabled(!isSpeechEnabled);
   };
