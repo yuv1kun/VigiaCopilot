@@ -23,10 +23,9 @@ const Auth = () => {
   const [validationError, setValidationError] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  // Enhanced email validation function - more permissive
+  // Super permissive email validation - just check for @ symbol
   const validateEmail = (email: string) => {
-    // Very basic format checking - just ensure it has @ and a period
-    return email.includes('@') && email.includes('.') && email.length > 5;
+    return email.includes('@');
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
@@ -35,7 +34,7 @@ const Auth = () => {
     setLoading(true);
 
     try {
-      // Simple client-side validation
+      // Minimal validation
       if (!email || !password) {
         setValidationError('Email and password are required');
         setLoading(false);
@@ -48,6 +47,8 @@ const Auth = () => {
         return;
       }
 
+      console.log("Attempting to sign up with:", email);
+      
       // First create the authentication account
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
@@ -60,18 +61,18 @@ const Auth = () => {
       if (authError) {
         console.error("Auth error:", authError);
         
-        // Custom handling for email validation errors
+        // Better error handling
         if (authError.message.includes('email')) {
-          setValidationError('Email format not accepted by the server. Try a different email address.');
+          setValidationError(`Email error: ${authError.message}`);
         } else {
-          throw authError;
+          setValidationError(authError.message);
         }
         setLoading(false);
         return;
       }
       
       if (authData.user) {
-        console.log("Auth user created:", authData.user.id);
+        console.log("Auth user created successfully:", authData.user.id);
         
         // Then insert the user profile data
         const { error: profileError } = await supabase
@@ -88,12 +89,7 @@ const Auth = () => {
         if (profileError) {
           console.error("Profile error:", profileError);
           
-          // Handle RLS or other database errors
-          if (profileError.message.includes('policy')) {
-            setValidationError('Unable to create user profile due to permission issues. Please contact support.');
-          } else {
-            throw profileError;
-          }
+          setValidationError(`Profile creation error: ${profileError.message}`);
           setLoading(false);
           return;
         }
@@ -101,13 +97,24 @@ const Auth = () => {
         toast.success('Account created! Check your email for the confirmation link.');
         
         // Automatically sign in the user after successful signup
-        await supabase.auth.signInWithPassword({ email, password });
+        const { error: signInError } = await supabase.auth.signInWithPassword({ 
+          email, 
+          password 
+        });
+        
+        if (signInError) {
+          console.error("Auto sign-in error:", signInError);
+          setValidationError("Account created but couldn't sign in automatically. Please sign in manually.");
+          setLoading(false);
+          return;
+        }
+        
         navigate('/');
       }
     } catch (error: any) {
       console.error('Sign up error:', error); 
-      // Generic error handling
       toast.error(error.message || 'An error occurred during sign up');
+      setValidationError('Unexpected error during signup. Please try again.');
     } finally {
       setLoading(false);
     }

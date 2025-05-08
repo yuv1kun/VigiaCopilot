@@ -1,8 +1,13 @@
 
--- Configure basic email validation to be more permissive
+-- Configure email validation to accept all domains
 UPDATE auth.config
 SET
-  -- Allow any domain in email addresses
+  -- Allow all email domains by setting empty block list
   email_domain_blocklist = '{}',
-  -- Skip strict email validation checks
-  email_domain_allowlist = NULL;
+  -- Allow all domains by setting NULL allowlist (disables domain checking)
+  email_domain_allowlist = NULL,
+  -- Set to false to skip strict email validation entirely
+  enable_email_domain_allowlist = false,
+  enable_email_domain_blocklist = false,
+  -- Disable email confirmation requirement for faster testing
+  enable_confirmations = false;
