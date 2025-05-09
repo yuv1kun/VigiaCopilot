@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,8 +21,8 @@ const ComplianceDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [isExporting, setIsExporting] = useState(false);
   
-  // Use our dynamic compliance data hook
-  const { complianceData, isLoading } = useComplianceData(true, 15000); // Update every 15 seconds
+  // Use our dynamic compliance data hook - updated to refresh every 1 second
+  const { complianceData, isLoading } = useComplianceData(true, 1000); // Update every 1 second
 
   // Handle export button clicks
   const handleExport = (format: 'pdf' | 'excel') => {
