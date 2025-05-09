@@ -12,18 +12,16 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useRealTimeMonitoring } from '@/hooks/useRealTimeMonitoring';
 import { useEquipmentStatus } from '@/hooks/useEquipmentStatus';
 import { 
-  getGeminiApiKey, 
-  setGeminiApiKey, 
-  hasGeminiApiKey, 
-  generateGeminiResponse,
-  MessageRole,
-  GeminiMessage 
-} from '@/utils/geminiAPI';
+  generateGroqResponse, 
+  GroqMessage,
+  hasGroqApiKey
+} from '@/utils/groqAPI';
+import { generateSpeech } from '@/utils/groqAPI';
 import { SAFETY_PARAMETERS, SAFETY_THRESHOLDS } from '@/utils/monitoringUtils';
 
 // Define message type for local state management
 interface Message {
-  role: MessageRole;
+  role: 'user' | 'system' | 'model';
   content: string;
 }
 
@@ -46,7 +44,9 @@ const AIAssistant: React.FC = () => {
   const lastResponseRef = useRef<string>('');
   const [showApiKeyDialog, setShowApiKeyDialog] = useState(false);
   const [apiKeyInput, setApiKeyInput] = useState('');
-  const [apiKeyExists, setApiKeyExists] = useState(false);
+  const [hasKey, setHasKey] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const isPlayingRef = useRef<boolean>(false);
   
   // Connect to real-time monitoring data
   const monitoringData = useRealTimeMonitoring();
@@ -131,9 +131,9 @@ const AIAssistant: React.FC = () => {
   // Check if API key exists on component mount
   useEffect(() => {
     const checkApiKey = async () => {
-      const hasKey = await hasGeminiApiKey();
-      setApiKeyExists(hasKey);
-      if (!hasKey && user) {
+      const hasApiKey = hasGroqApiKey();
+      setHasKey(hasApiKey);
+      if (!hasApiKey && user) {
         setShowApiKeyDialog(true);
       }
     };
@@ -157,6 +157,35 @@ const AIAssistant: React.FC = () => {
     
     return () => {
       stopSpeaking();
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = '';
+      }
+    };
+  }, []);
+
+  // Create or update audio element
+  useEffect(() => {
+    if (!audioRef.current) {
+      audioRef.current = new Audio();
+      
+      // Add event listeners
+      audioRef.current.addEventListener('ended', () => {
+        isPlayingRef.current = false;
+      });
+      
+      audioRef.current.addEventListener('error', (e) => {
+        console.error('Audio playback error:', e);
+        isPlayingRef.current = false;
+      });
+    }
+    
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.removeEventListener('ended', () => {});
+        audioRef.current.removeEventListener('error', () => {});
+      }
     };
   }, []);
 
@@ -167,12 +196,54 @@ const AIAssistant: React.FC = () => {
     // Only speak system messages (AI responses) and only when speech is enabled
     if (lastMessage?.role === 'system' && isSpeechEnabled && lastMessage.content !== lastResponseRef.current) {
       lastResponseRef.current = lastMessage.content;
-      console.log('Speaking message:', lastMessage.content);
-      speak(lastMessage.content).catch(err => {
-        console.error('Speech error:', err);
-      });
+      
+      // Decide which TTS method to use based on API key availability
+      if (hasGroqApiKey()) {
+        // Use Groq TTS
+        playTextWithGroq(lastMessage.content).catch(err => {
+          console.error('Groq TTS error:', err);
+          // Fall back to browser TTS
+          speak(lastMessage.content).catch(err => {
+            console.error('Browser speech error:', err);
+          });
+        });
+      } else {
+        // Use browser's built-in TTS
+        speak(lastMessage.content).catch(err => {
+          console.error('Browser speech error:', err);
+        });
+      }
     }
   }, [messages, isSpeechEnabled]);
+
+  // Play text using Groq TTS API
+  const playTextWithGroq = async (text: string): Promise<void> => {
+    try {
+      if (!audioRef.current) return;
+      
+      // Stop any current playback
+      audioRef.current.pause();
+      audioRef.current.src = '';
+      
+      // Generate speech from Groq
+      const audioUrl = await generateSpeech(text);
+      
+      // Set the audio source and play
+      audioRef.current.src = audioUrl;
+      isPlayingRef.current = true;
+      
+      const playPromise = audioRef.current.play();
+      if (playPromise) {
+        playPromise.catch(error => {
+          console.error('Error playing audio:', error);
+          isPlayingRef.current = false;
+        });
+      }
+    } catch (error) {
+      console.error('Error with Groq TTS:', error);
+      throw error;
+    }
+  };
 
   // Enhanced local response generation with better answers to specific questions
   const generateLocalResponse = (query: string): string => {
@@ -431,17 +502,16 @@ const AIAssistant: React.FC = () => {
     return `I can help with information about safety protocols, maintenance schedules, equipment status, historical analysis, and weather conditions. Current key readings: BOP pressure at ${monitoringData.bopPressure.formattedValue} (${monitoringData.bopPressure.status}), wellhead temperature at ${monitoringData.wellheadTemperature.formattedValue} (${monitoringData.wellheadTemperature.status}), and gas detection at ${monitoringData.gasDetection.formattedValue} (${monitoringData.gasDetection.status}). How can I assist you today?`;
   };
 
-  // Generate AI response using Gemini API or fall back to local response
+  // Generate AI response using Groq API or fall back to local response
   const getAIResponse = async (query: string): Promise<string> => {
-    const hasKey = await hasGeminiApiKey();
-    if (!hasKey) {
+    if (!hasGroqApiKey()) {
       // Fall back to local response if no API key is available
-      console.log("No API key available, using local response generator");
+      console.log("No Groq API key available, using local response generator");
       return generateLocalResponse(query);
     }
     
     try {
-      // Context for Gemini API using current live data
+      // Context for Groq API using current live data
       const systemContext = `You are Vigía AI Assistant, an AI assistant for an offshore oil rig safety monitoring system.
       You should respond to queries about equipment status, maintenance schedules, safety protocols, and operational procedures.
       Current system status: ${JSON.stringify(liveSystemStatus.current)}
@@ -454,23 +524,23 @@ const AIAssistant: React.FC = () => {
       - Pipe Corrosion: ${monitoringData.pipeCorrosion.formattedValue} (${monitoringData.pipeCorrosion.status} status)
       - Next Maintenance: ${monitoringData.nextMaintenance.formattedValue} (${monitoringData.nextMaintenance.status} status)
       
-      Always include specific current values in your responses. Be precise and reference the most recent data.`;
+      Always include specific current values in your responses. Be precise and reference the most recent data. Keep responses concise and focused.`;
       
-      // Convert chat history to Gemini format
-      const geminiMessages: GeminiMessage[] = messages.slice(-5).map(msg => ({
+      // Convert chat history to Groq format
+      const groqMessages: GroqMessage[] = messages.slice(-5).map(msg => ({
         role: msg.role,
         content: msg.content
       }));
       
       // Add user's new query
-      geminiMessages.push({ role: 'user', content: query });
+      groqMessages.push({ role: 'user', content: query });
       
-      // Call Gemini API with timeout
-      const responsePromise = generateGeminiResponse(geminiMessages, systemContext);
+      // Call Groq API with timeout
+      const responsePromise = generateGroqResponse(groqMessages, systemContext);
       
       // Set a timeout for the API call (8 seconds)
       const timeoutPromise = new Promise<string>((_, reject) => {
-        setTimeout(() => reject(new Error("Gemini API request timed out")), 8000);
+        setTimeout(() => reject(new Error("Groq API request timed out")), 8000);
       });
       
       // Race between the API call and timeout
@@ -503,10 +573,14 @@ const AIAssistant: React.FC = () => {
     // Stop any ongoing speech when user sends a message
     if (isSpeechEnabled) {
       stopSpeaking();
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = '';
+      }
     }
     
     try {
-      // Get AI response from Gemini or fallback
+      // Get AI response from Groq or fallback
       const aiResponse = await getAIResponse(inputValue);
       
       setMessages([
@@ -556,13 +630,27 @@ const AIAssistant: React.FC = () => {
   const toggleSpeech = () => {
     if (isSpeechEnabled) {
       stopSpeaking();
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = '';
+      }
     } else {
       // If enabling speech, speak the last message
       const lastMessage = messages[messages.length - 1];
       if (lastMessage && lastMessage.role === 'system') {
-        speak(lastMessage.content).catch(err => {
-          console.error('Error speaking last message:', err);
-        });
+        if (hasGroqApiKey()) {
+          playTextWithGroq(lastMessage.content).catch(err => {
+            console.error('Error speaking with Groq TTS:', err);
+            // Fall back to browser TTS
+            speak(lastMessage.content).catch(err => {
+              console.error('Error speaking with browser TTS:', err);
+            });
+          });
+        } else {
+          speak(lastMessage.content).catch(err => {
+            console.error('Error speaking with browser TTS:', err);
+          });
+        }
       }
     }
     setIsSpeechEnabled(!isSpeechEnabled);
@@ -571,13 +659,13 @@ const AIAssistant: React.FC = () => {
   const saveApiKey = async () => {
     if (apiKeyInput.trim()) {
       setShowApiKeyDialog(false);
-      const success = await setGeminiApiKey(apiKeyInput.trim());
-      if (success) {
-        toast.success('Gemini API key saved');
-        setApiKeyExists(true);
-      } else {
-        toast.error('Failed to save API key');
-      }
+      // In a real implementation, you would save the API key to a secure storage
+      // But for this demo, we'll just set it in the environment
+      // NOTE: In a real app, you should never set environment variables at runtime
+      // This is just for demonstration purposes
+      localStorage.setItem('GROQ_API_KEY', apiKeyInput.trim());
+      toast.success('API key saved');
+      setHasKey(true);
       setApiKeyInput('');
     } else {
       toast.error('Please enter a valid API key');
@@ -631,10 +719,16 @@ const AIAssistant: React.FC = () => {
               size="icon" 
               onClick={toggleSpeech} 
               title={isSpeechEnabled ? "Disable voice responses" : "Enable voice responses"}
+              aria-pressed={isSpeechEnabled}
+              aria-label={isSpeechEnabled ? "Disable voice responses" : "Enable voice responses"}
             >
               {isSpeechEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
             </Button>
-            <Button variant="ghost" size="icon">
+            <Button 
+              variant="ghost" 
+              size="icon"
+              aria-label="Notifications"
+            >
               <Bell className="h-4 w-4" />
             </Button>
           </div>
@@ -649,6 +743,8 @@ const AIAssistant: React.FC = () => {
                   ? 'ml-auto bg-vigia-teal text-black' 
                   : 'bg-secondary'
               } animate-fade-in`}
+              role={message.role === 'user' ? 'log' : 'alert'}
+              aria-live={message.role === 'user' ? 'off' : 'polite'}
             >
               {message.content}
             </div>
@@ -671,6 +767,7 @@ const AIAssistant: React.FC = () => {
                 key={index}
                 onClick={() => handleSuggestedQuery(query)}
                 className="text-xs bg-secondary py-1 px-2 rounded-full hover:bg-secondary/80 flex items-center gap-1 transition-colors"
+                aria-label={`Suggested query: ${query}`}
               >
                 {index === 0 && <Activity className="h-3 w-3" />}
                 {index === 1 && <FileText className="h-3 w-3" />}
@@ -690,8 +787,14 @@ const AIAssistant: React.FC = () => {
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               className="bg-muted border-muted"
+              aria-label="Ask a question"
             />
-            <Button type="submit" size="sm" className="flex-shrink-0">
+            <Button 
+              type="submit" 
+              size="sm" 
+              className="flex-shrink-0"
+              aria-label="Send message"
+            >
               <ArrowRight className="h-4 w-4" />
             </Button>
           </form>
@@ -702,23 +805,23 @@ const AIAssistant: React.FC = () => {
       <Dialog open={showApiKeyDialog} onOpenChange={setShowApiKeyDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Gemini API Key Required</DialogTitle>
+            <DialogTitle>Groq API Key Required</DialogTitle>
             <DialogDescription>
-              Please enter your Gemini API key to enable AI responses. 
-              Your key will be stored securely in your user profile.
+              Please enter your Groq API key to enable AI responses with speech capability. 
+              You can get a key at https://console.groq.com/keys.
             </DialogDescription>
           </DialogHeader>
           
           <div className="py-4">
             <Input
               type="password"
-              placeholder="Enter Gemini API Key"
+              placeholder="Enter Groq API Key"
               value={apiKeyInput}
               onChange={(e) => setApiKeyInput(e.target.value)}
               className="w-full"
             />
             <p className="mt-2 text-xs text-muted-foreground">
-              You can get a Gemini API key from the Google AI Studio website. The key will be stored securely with your user profile.
+              In a production app, this key would be stored securely server-side. For this demo, it will be stored locally.
             </p>
           </div>
           
@@ -732,6 +835,9 @@ const AIAssistant: React.FC = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      {/* Hidden audio element for Groq TTS playback */}
+      <audio ref={audioRef} style={{ display: 'none' }} />
     </>
   );
 };
