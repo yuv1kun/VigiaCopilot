@@ -13,6 +13,7 @@ import Alerts from "./pages/Alerts";
 import Profile from "./pages/Profile";
 import Auth from "./pages/Auth";
 import Analytics from "./pages/Analytics";
+import Reporting from "./pages/Reporting";
 
 const AppRoutes = () => {
   return (
@@ -25,6 +26,7 @@ const AppRoutes = () => {
         <Route path="/maintenance" element={<Maintenance />} />
         <Route path="/alerts" element={<Alerts />} />
         <Route path="/analytics" element={<Analytics />} />
+        <Route path="/reporting" element={<Reporting />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>

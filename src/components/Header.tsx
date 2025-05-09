@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Bell, Eye, Gauge, Wrench } from 'lucide-react';
+import { Bell, Eye, Gauge, Wrench, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link, useLocation } from 'react-router-dom';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -302,6 +302,17 @@ const Header: React.FC = () => {
               <Link to="/maintenance">
                 <Wrench className="h-4 w-4" />
                 <span>Maintenance</span>
+              </Link>
+            </Button>
+            <Button 
+              variant={isActive('/reporting') ? "default" : "ghost"} 
+              className="flex items-center space-x-1" 
+              size="sm"
+              asChild
+            >
+              <Link to="/reporting">
+                <FileText className="h-4 w-4" />
+                <span>Reporting</span>
               </Link>
             </Button>
             <Button 
