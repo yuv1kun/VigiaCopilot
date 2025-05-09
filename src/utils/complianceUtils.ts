@@ -438,3 +438,136 @@ export function generateMockComplianceData(): ComplianceData {
     auditTrail
   };
 }
+
+/**
+ * Simulate changes in compliance metrics over time
+ * This function takes the current compliance data and applies realistic variations
+ * to simulate dynamic changes in compliance status that would occur in a real oil rig
+ * 
+ * @param currentData The current compliance data state
+ * @returns {ComplianceData} Updated compliance data with realistic variations
+ */
+export function simulateComplianceChanges(currentData: ComplianceData): ComplianceData {
+  if (!currentData) return generateMockComplianceData();
+  
+  const now = new Date();
+  
+  // Create a copy of the current data to modify
+  const updatedData = { ...currentData };
+  
+  // Simulate small random changes in overall compliance score (±1%)
+  const scoreChange = Math.random() > 0.7 ? (Math.random() > 0.5 ? 1 : -1) : 0;
+  updatedData.overallScore = Math.max(60, Math.min(100, updatedData.overallScore + scoreChange));
+  
+  // Occasionally update OSHA and NORSOK compliance scores
+  if (Math.random() > 0.8) {
+    const oshaChange = Math.random() > 0.6 ? (Math.random() > 0.5 ? 1 : -2) : 0;
+    updatedData.oshaCompliance = Math.max(60, Math.min(100, updatedData.oshaCompliance + oshaChange));
+  }
+  
+  if (Math.random() > 0.8) {
+    const norsokChange = Math.random() > 0.6 ? (Math.random() > 0.5 ? 1 : -2) : 0;
+    updatedData.norsokCompliance = Math.max(60, Math.min(100, updatedData.norsokCompliance + norsokChange));
+  }
+  
+  // Occasionally change compliance item status (1% chance per item)
+  const updatedComplianceItems = updatedData.complianceItems.map(item => {
+    if (Math.random() < 0.01) {
+      return { 
+        ...item, 
+        isCompliant: !item.isCompliant,
+        lastCheckedDate: format(now, 'yyyy-MM-dd')
+      };
+    }
+    return item;
+  });
+  updatedData.complianceItems = updatedComplianceItems;
+  
+  // Update compliance status counts
+  const oshaItems = updatedComplianceItems.filter(item => item.standard === 'OSHA');
+  const norsokItems = updatedComplianceItems.filter(item => item.standard === 'NORSOK');
+  
+  const oshaCompliantCount = oshaItems.filter(item => item.isCompliant).length;
+  const norsokCompliantCount = norsokItems.filter(item => item.isCompliant).length;
+  
+  updatedData.oshaStandardsMet = oshaCompliantCount;
+  updatedData.norsokStandardsMet = norsokCompliantCount;
+  
+  // Occasionally add new audit trail record (3% chance)
+  if (Math.random() < 0.03) {
+    const newAuditRecord: AuditTrailRecord = {
+      id: `audit-${updatedData.auditTrail.length + 1}`,
+      action: Math.random() > 0.5 ? 'Document Updated' : 'Inspection Performed',
+      timestamp: now,
+      user: ['John Smith', 'Sarah Lee', 'Robert Johnson', 'Amy Chen'][Math.floor(Math.random() * 4)],
+      details: Math.random() > 0.5 
+        ? 'Scheduled maintenance inspection completed'
+        : 'Safety procedure documentation updated',
+      category: Math.random() > 0.5 ? 'Documentation' : 'Inspection',
+      relatedItemId: `doc-${Math.floor(Math.random() * 100)}`
+    };
+    
+    updatedData.auditTrail = [newAuditRecord, ...updatedData.auditTrail.slice(0, 9)];
+  }
+  
+  // Very occasionally add new incident (0.5% chance)
+  if (Math.random() < 0.005) {
+    const newIncident: Incident = {
+      id: `inc-${updatedData.incidents.length + 1}`,
+      title: 'New safety observation reported',
+      description: 'Minor procedural violation observed during routine inspection. No immediate risk.',
+      date: now,
+      location: 'Platform A, Main Deck',
+      severity: 'minor',
+      status: 'open',
+      reportedBy: 'Safety Officer',
+    };
+    
+    updatedData.incidents = [newIncident, ...updatedData.incidents];
+    updatedData.incidentCount += 1;
+    updatedData.minorIncidents += 1;
+  }
+  
+  // Update upcoming deadlines - reduce days remaining
+  updatedData.upcomingDeadlines = updatedData.upcomingDeadlines.map(deadline => {
+    // Randomly decide if we should reduce the days remaining (to simulate time passing)
+    if (Math.random() > 0.7) {
+      const newDaysRemaining = Math.max(0, deadline.daysRemaining - 1);
+      
+      // If days remaining reaches 0, either remove it or reset it (if recurring)
+      if (newDaysRemaining === 0 && deadline.isRecurring) {
+        // For recurring items, reset to a new deadline 30-60 days in the future
+        return {
+          ...deadline,
+          daysRemaining: Math.floor(Math.random() * 30) + 30,
+        };
+      }
+      
+      return {
+        ...deadline,
+        daysRemaining: newDaysRemaining
+      };
+    }
+    
+    return deadline;
+  }).filter(deadline => deadline.daysRemaining > 0);
+  
+  // Occasionally add a new deadline (2% chance)
+  if (Math.random() < 0.02 && updatedData.upcomingDeadlines.length < 6) {
+    const newDeadline: ComplianceDeadline = {
+      title: 'New Compliance Requirement',
+      description: 'Implementation of updated safety protocol',
+      dueDate: addDays(now, Math.floor(Math.random() * 20) + 5),
+      daysRemaining: Math.floor(Math.random() * 20) + 5,
+      standard: Math.random() > 0.5 ? 'OSHA Process Safety' : 'NORSOK S-006',
+      isRecurring: Math.random() > 0.7
+    };
+    
+    updatedData.upcomingDeadlines.push(newDeadline);
+    
+    // Sort by days remaining
+    updatedData.upcomingDeadlines.sort((a, b) => a.daysRemaining - b.daysRemaining);
+  }
+  
+  return updatedData;
+}

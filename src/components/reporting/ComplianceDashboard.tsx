@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart3, Calendar, CheckSquare, FileText, Shield, AlertTriangle, Download } from 'lucide-react';
@@ -9,7 +9,7 @@ import ComplianceOverview from './ComplianceOverview';
 import ComplianceTable from './ComplianceTable';
 import IncidentTable from './IncidentTable';
 import AuditTrailTable from './AuditTrailTable';
-import { ComplianceData, generateMockComplianceData } from '@/utils/complianceUtils';
+import { useComplianceData } from '@/hooks/useComplianceData';
 
 /**
  * ComplianceDashboard component for displaying OSHA/NORSOK compliance information
@@ -20,33 +20,10 @@ import { ComplianceData, generateMockComplianceData } from '@/utils/complianceUt
 const ComplianceDashboard: React.FC = () => {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('overview');
-  const [complianceData, setComplianceData] = useState<ComplianceData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
-
-  // Fetch compliance data
-  useEffect(() => {
-    // In a real implementation, this would fetch from an API
-    // For now, we'll use mock data
-    const fetchData = async () => {
-      try {
-        // Simulate API fetch delay
-        await new Promise(resolve => setTimeout(resolve, 800));
-        const data = generateMockComplianceData();
-        setComplianceData(data);
-      } catch (error) {
-        toast({
-          title: "Error fetching compliance data",
-          description: "There was an error loading the compliance information.",
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [toast]);
+  
+  // Use our dynamic compliance data hook
+  const { complianceData, isLoading } = useComplianceData(true, 15000); // Update every 15 seconds
 
   // Handle export button clicks
   const handleExport = (format: 'pdf' | 'excel') => {
@@ -215,7 +192,7 @@ const ComplianceDashboard: React.FC = () => {
                   className="flex items-center gap-1"
                   onClick={() => toast({
                     title: "Refreshed",
-                    description: "Audit data has been updated.",
+                    description: "Incident data has been updated.",
                   })}
                 >
                   <Calendar className="h-3.5 w-3.5" />
